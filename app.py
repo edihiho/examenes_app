@@ -57,6 +57,10 @@ def actualizar_duracion_examen(examen_id, duracion):
     finally:
         conn.close()
 
+@app.route('/')
+def index():
+    return redirect(url_for('login'))
+
 def create_app():
     create_tables()
     crear_admins()
@@ -104,7 +108,6 @@ def create_app():
             return redirect(url_for('login'))
         config_data = load_app_config()
         usuarios = AuthController.listar_usuarios(usuario.get('tipo_usuario'))
-        # Utiliza el método adecuado para obtener estadísticas
         examenes = EstadisticasController.obtener_examenes_por_tipo(usuario.get('tipo_usuario'))
         active_tab = request.args.get('active_tab', 'usuarios')
         return render_template(
