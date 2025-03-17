@@ -3,18 +3,15 @@ import sys
 import shutil
 import time
 import random
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, jsonify
 from config.database import create_tables, crear_admins, get_connection
 from controllers.auth_controller import AuthController
 from controllers.pregunta_controller import PreguntaController
 from controllers.estadisticas_controller import EstadisticasController
 from utils.app_config import load_app_config, save_app_config
 from utils.file_loader import FileLoader
-from flask import jsonify, request
-from config.database import get_connection
 import pandas as pd
 from flask import Response
-
 
 # Forzar la inclusión de la carpeta raíz del proyecto en sys.path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "."))
@@ -61,6 +58,11 @@ def create_app():
     create_tables()
     crear_admins()
 
+    # --- RUTA RAÍZ ---
+    @app.route('/')
+    def index():
+        return redirect(url_for('login'))
+
     # --- LOGIN ---
     @app.route('/login', methods=['GET', 'POST'])
     def login():
@@ -104,7 +106,6 @@ def create_app():
             return redirect(url_for('login'))
         config_data = load_app_config()
         usuarios = AuthController.listar_usuarios(usuario.get('tipo_usuario'))
-        # Utiliza el método adecuado para obtener estadísticas
         examenes = EstadisticasController.obtener_examenes_por_tipo(usuario.get('tipo_usuario'))
         active_tab = request.args.get('active_tab', 'usuarios')
         return render_template(
@@ -361,21 +362,19 @@ def create_app():
         flash("Funcionalidad de gráfica pendiente.", "info")
         return redirect(url_for('admin_statistics'))
     
-   # --- CAMBIAR CONTRASEÑA ---
+    # --- CAMBIAR CONTRASEÑA ---
     @app.route('/admin/cambiar_contraseña/<int:user_id>', methods=['GET', 'POST'])
     def cambiar_contraseña(user_id):
         usuario = session.get('usuario')
         if not usuario:
             flash("Debe iniciar sesión.", "error")
             return redirect(url_for('login'))
-        # Permitir el cambio si es admin o el mismo usuario
         if usuario['rol'] != 'admin' and usuario['id'] != user_id:
             flash("Acceso denegado.", "error")
             return redirect(url_for('login'))
         if request.method == 'POST':
             nueva_contraseña = request.form.get('nueva_contraseña')
             confirmar_contraseña = request.form.get('confirmar_contraseña')
-            # Validaciones
             if not nueva_contraseña or not confirmar_contraseña:
                 flash("Por favor, complete ambos campos.", "error")
                 return redirect(url_for('cambiar_contraseña', user_id=user_id))
@@ -385,7 +384,6 @@ def create_app():
             if len(nueva_contraseña) < 6:
                 flash("La contraseña debe tener al menos 6 caracteres.", "error")
                 return redirect(url_for('cambiar_contraseña', user_id=user_id))
-            # Intentar cambiar la contraseña
             if AuthController.cambiar_contrasena(user_id, nueva_contraseña):
                 return redirect(url_for('admin_users'))
             else:
@@ -402,7 +400,6 @@ def create_app():
             return redirect(url_for('login'))
         config_data = load_app_config()
         if request.method == 'GET':
-            # Si es un nuevo examen, crear y seleccionar preguntas aleatoriamente
             if 'examen_id' not in session or 'preguntas_examen' not in session:
                 examen_id = crear_examen(usuario['id'])
                 if examen_id is None:
@@ -416,7 +413,7 @@ def create_app():
                 session['preguntas_examen'] = all_preguntas[:max_preguntas]
             preguntas = session.get('preguntas_examen', [])
             return render_template('examen_view.html', usuario=usuario, preguntas=preguntas, config_data=config_data)
-        else:  # POST: Envío de respuestas
+        else:
             examen_id = session.get('examen_id')
             if not examen_id:
                 flash("No se encontró el examen en sesión.", "error")
@@ -430,36 +427,26 @@ def create_app():
                 if opcion_id:
                     PreguntaController.guardar_respuesta(examen_id, pregunta['id'], opcion_id)
             flash("Respuestas enviadas correctamente.", "success")
-            # Limpiar datos del examen en sesión
             session.pop('examen_id', None)
             session.pop('examen_start', None)
             session.pop('preguntas_examen', None)
             return redirect(url_for('resultados_view', exam_id=examen_id))
 
-        # --- RESULTADOS Y ESTADÍSTICAS DEL EXAMEN ACTUAL ---
+    # --- RESULTADOS Y ESTADÍSTICAS DEL EXAMEN ACTUAL ---
     @app.route('/resultados/<int:exam_id>')
     def resultados_view(exam_id):
         stats = EstadisticasController.obtener_estadisticas_examen(exam_id)
-        return render_template('resultados_view.html', exam_id=exam_id, stats=stats)    
-    
+        return render_template('resultados_view.html', exam_id=exam_id, stats=stats)
+
     @app.route('/admin/grafica/calificacion')
     def grafica_calificacion():
-        # Se obtiene el parámetro 'usuario' que puede venir como una cadena separada por comas.
         usuarios_str = request.args.get('usuario', '').strip()
-        # Se convierte la cadena en una lista de nombres (ignorando espacios extra).
         lista_usuarios = [u.strip() for u in usuarios_str.split(',') if u.strip()] if usuarios_str else []
-
-        # Obtener el rango de fechas: 'fecha_inicio' y 'fecha_fin' en formato YYYY-MM-DD.
         fecha_inicio = request.args.get('fecha_inicio', '').strip()
         fecha_fin = request.args.get('fecha_fin', '').strip()
-
-        # Obtener el filtro de localidad
         localidad = request.args.get('localidad', '').strip()
-
         conn = get_connection()
         cursor = conn.cursor()
-
-        # Consulta base: se seleccionan exámenes con nombre de usuario, fecha, respuestas correctas y totales.
         query = """
             SELECT e.id AS exam_id,
                 u.nombre,
@@ -475,48 +462,36 @@ def create_app():
             WHERE 1=1
         """
         params = []
-
-        # Filtrar por usuarios si se especifica
         if lista_usuarios:
             placeholders = ",".join("?" for _ in lista_usuarios)
             query += f" AND u.nombre IN ({placeholders})"
             params.extend(lista_usuarios)
-
-        # Filtrar por localidad si se especifica
         if localidad:
             query += " AND u.localidad = ?"
             params.append(localidad)
-
-        # Filtrar por rango de fechas si se especifica
         if fecha_inicio:
             query += " AND date(e.fecha) >= ?"
             params.append(fecha_inicio)
         if fecha_fin:
             query += " AND date(e.fecha) <= ?"
             params.append(fecha_fin)
-        
         query += " ORDER BY e.fecha DESC"
-        
         cursor.execute(query, params)
         rows = cursor.fetchall()
         conn.close()
-
         labels = []
         calificaciones = []
         for row in rows:
             total = row["total_respuestas"]
             correct = row["correctas"]
-            # Calcular la nota: (correct / total) * 10, redondeada a dos decimales; si total es 0, nota es 0.
             grade = round((correct / total) * 10, 2) if total > 0 else 0.0
-            # En la etiqueta se incluye el ID del examen, el nombre del usuario y la fecha.
             labels.append(f"Examen {row['exam_id']} - {row['nombre']} - {row['fecha']}")
             calificaciones.append(grade)
-
         data = {
             "labels": labels,
             "calificaciones": calificaciones
         }
-        return jsonify(data)    
+        return jsonify(data)
 
     @app.route('/admin/exportar_excel_calificacion')
     def exportar_excel_calificacion():
@@ -524,16 +499,11 @@ def create_app():
         if not usuario or usuario.get('rol') != 'admin':
             flash("Acceso denegado.", "error")
             return redirect(url_for('login'))
-        
-        # Obtener parámetros de filtro desde la URL
         filtro_usuarios = request.args.get('usuario', '')
         filtro_fecha_inicio = request.args.get('fecha_inicio', '')
         filtro_fecha_fin = request.args.get('fecha_fin', '')
-
         conn = get_connection()
         cursor = conn.cursor()
-
-        # Consulta SQL con filtros dinámicos (incluye la columna 'localidad')
         query = """
         SELECT u.nombre, u.localidad, e.id AS examen_id, datetime(e.fecha, 'localtime') AS fecha,
             e.duracion,
@@ -554,18 +524,13 @@ def create_app():
                 placeholders = ",".join("?" for _ in usuarios_lista)
                 query += f" AND u.nombre IN ({placeholders})"
                 params.extend(usuarios_lista)
-        
         if filtro_fecha_inicio and filtro_fecha_fin:
             query += " AND e.fecha BETWEEN ? AND ?"
             params.extend([filtro_fecha_inicio, filtro_fecha_fin])
-
         query += " ORDER BY e.fecha DESC"
-
         cursor.execute(query, params)
         rows = cursor.fetchall()
         conn.close()
-
-        # Crear DataFrame para exportación, calculando la nota final y el porcentaje
         data = []
         for row in rows:
             total_preguntas = row["correctas"] + row["incorrectas"]
@@ -582,37 +547,26 @@ def create_app():
                 "Nota Final": nota_final,
                 "Porcentaje": porcentaje
             })
-
-        import pandas as pd
         df = pd.DataFrame(data)
-
-        # Crear un directorio temporal si no existe
         temp_dir = os.path.join(project_root, "temp")
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
         file_path = os.path.join(temp_dir, "estadisticas.xlsx")
-        
-        # Exportar a Excel usando un context manager para asegurar el cierre correcto
         with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Estadísticas")
-        
         return send_file(
             file_path,
             as_attachment=True,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            download_name="estadisticas.xlsx"  # Para Flask 2.x
+            download_name="estadisticas.xlsx"
         )
-    
+
     @app.route('/admin/grafica/top_incorrectas_preguntas')
     def grafica_top_incorrectas_preguntas():
-        # Obtener los filtros de fecha desde la URL
         fecha_inicio = request.args.get('fecha_inicio', '').strip()
         fecha_fin = request.args.get('fecha_fin', '').strip()
-        
         conn = get_connection()
         cursor = conn.cursor()
-        
-        # Construir la consulta con filtro por fechas (si se proporcionan)
         query = """
             SELECT p.pregunta, COUNT(r.id) AS incorrectas
             FROM preguntas p
@@ -629,19 +583,33 @@ def create_app():
             query += " AND date(e.fecha) <= ?"
             params.append(fecha_fin)
         query += " GROUP BY p.id ORDER BY incorrectas DESC LIMIT 10"
-        
         cursor.execute(query, params)
         rows = cursor.fetchall()
         conn.close()
-        
         labels = [row["pregunta"] for row in rows]
         incorrect_counts = [row["incorrectas"] for row in rows]
         return jsonify({
             "labels": labels,
             "incorrect_counts": incorrect_counts
         })
-        
-    app = create_app()
+
+    return app
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app = create_app()
+    # Detecta el entorno: 'development' para local, 'production' (u otro) para producción.
+    env = os.getenv('FLASK_ENV', 'production').lower()
+
+    if env == 'development':
+        # Configuración para desarrollo local
+        host = os.getenv('FLASK_RUN_HOST', '127.0.0.1')
+        port = int(os.getenv('FLASK_RUN_PORT', 5000))
+        debug = True  # En desarrollo se activa el modo debug
+    else:
+        # Configuración para producción
+        host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
+        port = int(os.getenv('FLASK_RUN_PORT', 8000))
+        debug = False  # Desactivar debug en producción
+
+    app.run(host=host, port=port, debug=debug)
+
