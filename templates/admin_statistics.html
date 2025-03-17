@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estadísticas de Exámenes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Bootstrap CSS para estilos y diseño responsivo -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+  <style>
+    body {
+      background-color: #f7f7f7;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+    }
+    /* Se pueden agregar más estilos para mejorar la legibilidad si se desea */
+  </style>
+</head>
+<body>
+  <div class="container mt-4">
+    <!-- Botón para volver al Dashboard con confirmación -->
+    <div class="mb-3">
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-primary" onclick="if(!confirm('¿Está seguro de volver al Dashboard?')) return false;">
+        <i class="bi bi-house-door-fill"></i> Volver al Dashboard
+      </a>
+    </div>
+
+    <h2 class="mb-4">Estadísticas de Exámenes</h2>
+
+    <!-- Tabla de Estadísticas -->
+    <table class="table table-bordered">
+      <thead class="thead-light">
+        <tr>
+          <th>Usuario</th>
+          <th>Examen ID</th>
+          <th>Fecha</th>
+          <th>Duración (s)</th>
+          <th>Correctas</th>
+          <th>Incorrectas</th>
+          <th>Nota Final</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if examenes and examenes|length > 0 %}
+          {% for exam in examenes %}
+            {% set total = exam.correctas + exam.incorrectas %}
+            {% if total > 0 %}
+              {% set nota_final = (exam.correctas / total * 10) | round(2) %}
+            {% else %}
+              {% set nota_final = 0 %}
+            {% endif %}
+            <tr>
+              <td>{{ exam.nombre }}</td>
+              <td>{{ exam.examen_id }}</td>
+              <td>{{ exam.fecha }}</td>
+              <td>{{ exam.duracion }}</td>
+              <td>{{ exam.correctas }}</td>
+              <td>{{ exam.incorrectas }}</td>
+              <td>{{ nota_final }}</td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center">No hay exámenes registrados para este tipo de usuario.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    <!-- Sección para la Gráfica de Calificación -->
+    <div class="mt-5">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Gráfica de Calificación</h3>
+        <!-- Botón para exportar a Excel con confirmación -->
+        <a id="exportExcelBtn" href="{{ url_for('exportar_excel_calificacion') }}" class="btn btn-secondary" onclick="console.log('Exportar a Excel clickeado'); if(!confirm('¿Está seguro de exportar la información a Excel?')) return false;">
+          <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
+        </a>        
+      </div>
+      <!-- Filtros para la gráfica de calificación -->
+      <form id="filterForm" class="row g-3 align-items-center mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Usuarios:</label>
+          <div id="usuariosCheckboxes" class="d-flex flex-wrap">
+            {% set unique_users = [] %}
+            {% for exam in examenes %}
+              {% if exam.nombre not in unique_users %}
+                {% set _ = unique_users.append(exam.nombre) %}
+              {% endif %}
+            {% endfor %}
+            {% for user in unique_users %}
+              <div class="form-check me-2">
+                <input class="form-check-input" type="checkbox" name="usuarios" value="{{ user }}" id="user_{{ loop.index }}">
+                <label class="form-check-label" for="user_{{ loop.index }}">{{ user }}</label>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Localidad:</label>
+          <select class="form-select" id="filtroLocalidad" name="localidad">
+            <option value="">Todos</option>
+            <option value="Risaralda">Risaralda</option>
+            <option value="Caldas">Caldas</option>
+            <option value="Quindío">Quindío</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label for="filterFechaInicio" class="form-label">Fecha Inicio:</label>
+          <input type="date" class="form-control" id="filterFechaInicio" name="filterFechaInicio">
+        </div>
+        <div class="col-md-2">
+          <label for="filterFechaFin" class="form-label">Fecha Fin:</label>
+          <input type="date" class="form-control" id="filterFechaFin" name="filterFechaFin">
+        </div>
+        <div class="col-md-1 d-grid">
+          <button type="button" class="btn btn-primary" onclick="confirmFilter();">Filtrar</button>
+        </div>
+      </form>
+      <canvas id="calificacionChart" class="w-100" height="200"></canvas>
+    </div>
+
+    <!-- Sección para la Gráfica del Top 10 de Preguntas con Más Respuestas Incorrectas -->
+    <div class="mt-5">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Top 10 Preguntas con Más Respuestas Incorrectas</h3>
+      </div>
+      <canvas id="topIncorrectasChart" class="w-100" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Inclusión de Bootstrap JS, dependencias y Chart.js -->
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Confirmación para el botón de Exportar a Excel
+    document.getElementById("exportExcelBtn").addEventListener("click", function(e) {
+      if(!confirm("¿Está seguro de exportar la información a Excel?")) {
+        e.preventDefault();
+      }
+    });
+
+    // Función que solicita confirmación para aplicar los filtros y, de ser afirmativo, llama a fetchGraphData()
+    function confirmFilter() {
+      if(confirm("¿Está seguro de aplicar estos filtros?")) {
+        fetchGraphData();
+      }
+    }
+    
+    // Función para cargar la gráfica de calificación con filtros
+    function fetchGraphData(){
+      var checkboxes = document.querySelectorAll('input[name="usuarios"]:checked');
+      var usuarios = [];
+      checkboxes.forEach(function(cb) {
+        usuarios.push(cb.value);
+      });
+      var usuarioParam = usuarios.join(',');
+      var localidad = document.getElementById('filtroLocalidad').value;
+      var fechaInicio = document.getElementById('filterFechaInicio').value;
+      var fechaFin = document.getElementById('filterFechaFin').value;
+      var url = `/admin/grafica/calificacion?usuario=${encodeURIComponent(usuarioParam)}&localidad=${encodeURIComponent(localidad)}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`;
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+           var ctx = document.getElementById('calificacionChart').getContext('2d');
+           if(window.myChart) { window.myChart.destroy(); }
+           window.myChart = new Chart(ctx, {
+             type: 'bar',
+             data: {
+               labels: data.labels,
+               datasets: [{
+                 label: 'Calificación',
+                 data: data.calificaciones,
+                 backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                 borderColor: 'rgba(54, 162, 235, 1)',
+                 borderWidth: 1
+               }]
+             },
+             options: {
+               responsive: true,
+               scales: {
+                 y: {
+                   beginAtZero: true,
+                   max: 10,
+                   ticks: { callback: function(value) { return value.toFixed(2); } }
+                 }
+               },
+               plugins: {
+                 legend: {
+                   display: true,
+                   position: 'top',
+                   labels: {
+                     font: { size: 14 }
+                   }
+                 },
+                 tooltip: {
+                   enabled: true,
+                   callbacks: {
+                     label: function(context) { return context.parsed.y.toFixed(2); }
+                   },
+                   titleFont: { size: 16 },
+                   bodyFont: { size: 14 }
+                 }
+               }
+             }
+           });
+        })
+        .catch(error => console.error("Error al cargar datos de la gráfica:", error));
+    }
+    
+    // Función para cargar la gráfica del Top 10 de preguntas con más respuestas incorrectas
+    function fetchGraphDataTop(){
+      // URL sin filtros adicionales para cargar automáticamente la gráfica
+      var url = `/admin/grafica/top_incorrectas_preguntas`;
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          var ctx = document.getElementById('topIncorrectasChart').getContext('2d');
+          if(window.topChart) {
+            window.topChart.destroy();
+          }
+          window.topChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: data.labels,
+              datasets: [{
+                label: 'Respuestas Incorrectas',
+                data: data.incorrect_counts,
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: function(value) { return value.toFixed(2); }
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  display: true,
+                  position: 'top',
+                  labels: {
+                    font: { size: 14 }
+                  }
+                },
+                tooltip: {
+                  enabled: true,
+                  callbacks: {
+                    label: function(context) { return context.parsed.y.toFixed(2); }
+                  },
+                  titleFont: { size: 16 },
+                  bodyFont: { size: 14 }
+                }
+              }
+            }
+          });
+        })
+        .catch(error => console.error("Error al cargar datos de la gráfica de top incorrectas:", error));
+    }
+    
+    // Inicializar ambas gráficas cuando el DOM esté completamente cargado
+    document.addEventListener("DOMContentLoaded", function() {
+      fetchGraphData();
+      fetchGraphDataTop();
+    });
+  </script>
+</body>
+</html>

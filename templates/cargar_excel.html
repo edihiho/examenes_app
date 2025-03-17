@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cargar Preguntas desde Excel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Bootstrap CSS (opcional para estilos responsivos) -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+</head>
+<body>
+  <div class="container mt-4">
+    <h2>Cargar Preguntas desde Excel</h2>
+    <p>Seleccione un archivo Excel con preguntas</p>
+    <!-- Formulario para subir archivo Excel -->
+    <form action="{{ url_for('cargar_excel') }}" method="post" enctype="multipart/form-data" id="excelForm">
+      <div class="form-group">
+        <input type="file" name="excel_file" class="form-control-file" accept=".xlsx,.xls" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Cargar Preguntas</button>
+    </form>
+  </div>
+  
+  <!-- Inclusión de Bootstrap JS y dependencias -->
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  <script>
+    // Confirmación para evitar envíos accidentales
+    document.getElementById('excelForm').addEventListener('submit', function(e) {
+      if (!confirm("¿Está seguro de cargar las preguntas desde el archivo Excel?")) {
+        e.preventDefault();
+      }
+    });
+  </script>
+</body>
+</html>

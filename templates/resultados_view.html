@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resultados y Estadísticas</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Bootstrap CSS para estilos y diseño responsivo -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <style>
+    body {
+      background-color: #f7f7f7;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+    }
+    /* Estilos para mejorar la apariencia de los cards */
+    .card {
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .card-header {
+      font-weight: bold;
+    }
+    /* Estilo para la tabla de resumen de respuestas incorrectas */
+    .table-responsive {
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-5">
+    <!-- Logo centrado -->
+    <div class="text-center mb-4">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="max-width:200px;">
+    </div>
+    
+    <h2 class="mb-4">Resultados y Estadísticas del Examen</h2>
+    
+    <!-- Mensaje fijo debajo del título -->
+    <div class="alert alert-primary">
+      ¡Felicidades, examen finalizado! A continuación se muestra el resumen.
+    </div>
+    
+    <!-- Card de estadísticas generales -->
+    <div class="card">
+      <div class="card-body">
+        {% if stats %}
+          <p><strong>📌 Total de respuestas:</strong> {{ stats.total_respuestas }}</p>
+          <p><strong>✅ Preguntas correctas:</strong> {{ stats.preguntas_correctas }}</p>
+          <p><strong>❌ Preguntas incorrectas:</strong> {{ stats.preguntas_incorrectas }}</p>
+          {% if stats.total_respuestas > 0 %}
+            <p><strong>⭐ Calificación Final:</strong> {{ (stats.preguntas_correctas / stats.total_respuestas * 10) | round(2) }}</p>
+          {% endif %}
+        {% else %}
+          <div class="alert alert-warning" role="alert">
+            No se pudieron cargar las estadísticas.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Resumen de respuestas incorrectas -->
+    {% if resumen_incorrectas and resumen_incorrectas|length > 0 %}
+      <div class="card">
+        <div class="card-header bg-danger text-white">
+          Resumen de Respuestas Incorrectas
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Pregunta</th>
+                  <th>Respuesta Correcta</th>
+                  <th>Tu Respuesta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in resumen_incorrectas %}
+                  <tr>
+                    <td>{{ item.pregunta }}</td>
+                    <td>{{ item.respuesta_correcta }}</td>
+                    <td>{{ item.respuesta_usuario }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Botones de acción -->
+    <div class="mt-4">
+      <!-- Botón "Actualizar Estadísticas" usa exam_id -->
+      <a href="{{ url_for('resultados_view', exam_id=exam_id) }}" class="btn btn-primary" onclick="if(!confirm('¿Está seguro de actualizar las estadísticas?')) return false;">Actualizar Estadísticas</a>
+      <!-- Botón "Cerrar" redirige al dashboard -->
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary" onclick="if(!confirm('¿Está seguro de cerrar y volver al Dashboard?')) return false;">Cerrar</a>
+    </div>
+  </div>
+
+  <!-- Inclusión de Bootstrap JS, dependencias -->
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Examen - Cuestionario {{ usuario.cuestionario or 'OYM' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+  
+  {% if config_data.get('tema') == 'Oscuro' %}
+  <style>
+    body {
+      background-color: #2E2E2E;
+      color: #E0E0E0;
+    }
+    .card {
+      background-color: #3E3E3E;
+      border: none;
+    }
+    .btn-primary {
+      background-color: #0056b3;
+      border-color: #0056b3;
+    }
+  </style>
+  {% endif %}
+  
+  <style>
+    /* Aumentar tamaño de fuente general */
+    body {
+      font-size: 18px;
+    }
+    /* Encabezado fijo */
+    .fixed-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: inherit;
+      z-index: 1050;
+      border-bottom: 1px solid #ccc;
+      padding: 10px 15px;
+    }
+    /* Espaciado para evitar solapamiento con el header */
+    .content {
+      margin-top: 100px;
+    }
+    @media (max-width: 576px) {
+      .fixed-header {
+        padding: 8px 10px;
+      }
+      .content {
+        margin-top: 90px;
+      }
+    }
+    /* Estilo adicional para las tarjetas de preguntas */
+    .card {
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .card-header {
+      background-color: #f0f0f0;
+      font-weight: bold;
+    }
+  </style>
+  
+  {% if config_data.get('tema') == 'Oscuro' %}
+  <style>
+    .card-header {
+      background-color: #4A4A4A;
+    }
+  </style>
+  {% endif %}
+  
+  <script>
+    window.onload = function() {
+      // Verificar si el examen ya fue finalizado (almacenado en sessionStorage)
+      var examFinished = sessionStorage.getItem('examFinished') === 'true';
+      if (examFinished) {
+        history.pushState(null, null, location.href);
+        window.onpopstate = function(event) {
+          alert("Cuestionario finalizado, debe iniciar sesión nuevamente para iniciar un nuevo cuestionario");
+          location.href = "{{ url_for('login') }}";
+        }
+      }
+      
+      // Inicia el contador según el tiempo límite (en minutos)
+      var tiempoLimite = parseInt("{{ config_data.get('exam_params', {}).get('tiempo_limite', 0) }}", 10);
+      if (tiempoLimite > 0) {
+        var contador = document.getElementById("contador");
+        var tiempoEnSegundos = tiempoLimite * 60;
+        var alertaMostrada = false; // Para mostrar la alerta solo una vez
+        var interval = setInterval(function() {
+          var minutes = Math.floor(tiempoEnSegundos / 60);
+          var seconds = tiempoEnSegundos % 60;
+          contador.innerHTML = minutes + "m " + seconds + "s";
+          // Alerta cuando quedan 2 minutos (120 segundos)
+          if (tiempoEnSegundos <= 120 && !alertaMostrada) {
+            alert("¡Atención! Solo quedan 2 minutos para finalizar el examen. Responde rápido.");
+            alertaMostrada = true;
+          }
+          if (tiempoEnSegundos <= 0) {
+            clearInterval(interval);
+            alert("Se acabó el tiempo");
+            // Marca el examen como finalizado y envía el formulario
+            sessionStorage.setItem('examFinished', 'true');
+            document.getElementById("examenForm").submit();
+          }
+          tiempoEnSegundos--;
+        }, 1000);
+      }
+      
+      // Validación doble al enviar el formulario
+      var examenForm = document.getElementById("examenForm");
+      examenForm.addEventListener("submit", function(e) {
+        e.preventDefault(); // Prevenir el envío automático
+        var totalQuestions = parseInt(document.querySelector('input[name="total_preguntas"]').value);
+        var answered = document.querySelectorAll('input[type="radio"]:checked').length;
+        var missing = totalQuestions - answered;
+        
+        // Primera validación: informar cuántas preguntas faltan responder (si hay)
+        if (missing > 0) {
+          if (!confirm("Faltan " + missing + " preguntas por responder. ¿Desea continuar de todas formas?")) {
+            return; // Se cancela el envío
+          }
+        }
+        // Segunda validación: confirmar el envío final
+        if (!confirm("¿Está seguro de enviar las respuestas y finalizar el examen?")) {
+          return;
+        }
+        // Marcar el examen como finalizado en sessionStorage para prevenir que se regrese
+        sessionStorage.setItem('examFinished', 'true');
+        examenForm.submit();
+      });
+    }
+  </script>
+</head>
+<body>
+  <!-- Encabezado fijo -->
+  <div class="fixed-header">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="text-center w-50">
+        <h1 class="h4 mb-0"><strong>Cuestionario - {{ usuario.cuestionario or 'OYM' }}</strong></h1>
+        <p class="mb-0">Bienvenido, {{ usuario.nombre }}</p>
+        <small>Preguntas a responder: {{ config_data.get('exam_params', {}).get('num_preguntas', preguntas|length) }}</small>
+      </div>
+      {% if config_data.get('exam_params', {}).get('tiempo_limite', 0) > 0 %}
+      <div class="alert alert-info mb-0 d-flex align-items-center">
+        <i class="bi bi-clock-fill me-2"></i> Tiempo restante: <span id="contador"></span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Contenido principal centrado -->
+  <div class="container content">
+    <!-- Mensaje de instrucciones -->
+    <div class="alert alert-secondary text-center">
+      <strong>Instrucciones:</strong> Responda cada pregunta seleccionando la opción que considere correcta. Si no responde todas, se le pedirá confirmación antes de enviar.
+    </div>
+    
+    {% if preguntas %}
+      <div class="row justify-content-center">
+        <div class="col-md-8">
+          <form id="examenForm" action="{{ url_for('examen_view') }}" method="post">
+            <!-- Campo oculto para enviar el total de preguntas configuradas -->
+            <input type="hidden" name="total_preguntas" value="{{ config_data.get('exam_params', {}).get('num_preguntas', preguntas|length) }}">
+            {% set max_preguntas = config_data.get('exam_params', {}).get('num_preguntas', preguntas|length) %}
+            {% for pregunta in preguntas[:max_preguntas] %}
+              <div class="card mb-3">
+                <div class="card-header">
+                  Pregunta {{ loop.index }} de {{ max_preguntas }}: {{ pregunta.pregunta }}
+                </div>
+                <div class="card-body">
+                  {% for opcion in pregunta.opciones %}
+                    <div class="form-check">
+                      <!-- Se omite 'required' para permitir envíos incompletos -->
+                      <input class="form-check-input" type="radio" name="respuesta_{{ pregunta.id }}" id="opcion_{{ opcion.id }}" value="{{ opcion.id }}">
+                      <label class="form-check-label" for="opcion_{{ opcion.id }}">
+                        {{ opcion.opcion }}
+                      </label>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Enviar Respuestas</button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <p class="text-center">No hay preguntas disponibles.</p>
+    {% endif %}
+
+    <!-- Bloque de resumen de examen: mostrar solo si se envió el examen y se pasó la variable resumen_incorrectas -->
+    {% if resumen_incorrectas and resumen_incorrectas|length > 0 %}
+      <div class="card mt-4">
+        <div class="card-header bg-danger text-white">
+          Resumen de Respuestas Incorrectas
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Pregunta</th>
+                  <th>Respuesta Correcta</th>
+                  <th>Tu Respuesta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in resumen_incorrectas %}
+                  <tr>
+                    <td>{{ item.pregunta }}</td>
+                    <td>{{ item.respuesta_correcta }}</td>
+                    <td>{{ item.respuesta_usuario }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    {% elif resumen_incorrectas is defined %}
+      <div class="alert alert-success mt-4" role="alert">
+        ¡Felicidades! No hubo respuestas incorrectas.
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Bootstrap JS y dependencias -->
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+</body>
+</html>

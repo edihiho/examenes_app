@@ -1,0 +1,7 @@
+{
+    "exam_params": {
+        "num_preguntas": 10,
+        "tiempo_limite": 10
+    },
+    "tema": "Oscuro"
+}

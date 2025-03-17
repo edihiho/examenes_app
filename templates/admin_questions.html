@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de Preguntas - {{ tipo_usuario }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+</head>
+<body>
+  <div class="container mt-4">
+    <!-- Botón para volver al Dashboard -->
+    <div class="mb-3">
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-primary" onclick="if(!confirm('¿Está seguro de volver al Dashboard?')) return false;">Volver al Dashboard</a>
+    </div>
+
+    <h2 class="mb-4">Gestión de Preguntas - {{ tipo_usuario }}</h2>
+
+    <!-- Formulario para eliminar la pregunta seleccionada -->
+    <form action="{{ url_for('eliminar_pregunta') }}" method="post" id="deleteForm">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Seleccionar</th>
+            <th>ID</th>
+            <th>Pregunta</th>
+            <th>Opciones</th>
+            <th>Respuesta Correcta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if preguntas %}
+            {% for pr in preguntas %}
+            <tr>
+              <td>
+                <input type="radio" name="pregunta_id" value="{{ pr.id }}">
+              </td>
+              <td>{{ pr.id }}</td>
+              <td>{{ pr.pregunta }}</td>
+              <td>
+                {% for op in pr.opciones %}
+                  {{ loop.index }}) {{ op.opcion }}<br>
+                {% endfor %}
+              </td>
+              <td>
+                {% set respuestas = [] %}
+                {% for op in pr.opciones %}
+                  {% if op.es_correcta == 1 %}
+                    {% set _ = respuestas.append(op.opcion) %}
+                  {% endif %}
+                {% endfor %}
+                {{ respuestas|join(', ') if respuestas|length > 0 else "Ninguna" }}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center">No hay preguntas en la base de datos.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+      <button type="submit" class="btn btn-danger">Eliminar Pregunta Seleccionada</button>
+    </form>
+
+    <!-- Formulario para cargar preguntas desde Excel -->
+    <form action="{{ url_for('cargar_excel') }}" method="post" enctype="multipart/form-data" class="mt-4" id="excelForm">
+      <div class="form-group">
+        <label for="excelFile">Cargar Preguntas desde Excel</label>
+        <input type="file" class="form-control-file" id="excelFile" name="excel_file" accept=".xlsx,.xls" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Cargar Preguntas desde Excel</button>
+    </form>
+
+    <!-- Botón para actualizar la lista: redirige al endpoint 'admin_questions' -->
+    <div class="mt-4">
+      <a href="{{ url_for('admin_questions') }}" class="btn btn-secondary" onclick="if(!confirm('¿Está seguro de actualizar la lista de preguntas?')) return false;">Actualizar Lista</a>
+    </div>
+  </div>
+
+  <!-- Inclusión de Bootstrap JS y dependencias -->
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  <script>
+    // Validación y confirmación para el formulario de eliminación de pregunta
+    document.getElementById("deleteForm")?.addEventListener("submit", function(e) {
+      var selected = document.querySelector('input[name="pregunta_id"]:checked');
+      if (!selected) {
+        alert("Por favor, seleccione una pregunta a eliminar.");
+        e.preventDefault();
+        return;
+      }
+      if (!confirm("¿Está seguro de eliminar la pregunta seleccionada?")) {
+        e.preventDefault();
+        return;
+      }
+    });
+
+    // Validación y confirmación para el formulario de carga de Excel
+    document.getElementById("excelForm")?.addEventListener("submit", function(e) {
+      if (!confirm("¿Está seguro de cargar las preguntas desde el archivo Excel?")) {
+        e.preventDefault();
+        return;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cambiar Contraseña</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+</head>
+<body>
+  <div class="container mt-5">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-4">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'warning' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="close" data-dismiss="alert" aria-label="Cerrar">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    
+    <h2 class="mb-4">Cambiar Contraseña</h2>
+    <form action="{{ url_for('cambiar_contraseña', user_id=user_id) }}" method="post" id="changePasswordForm">
+      <div class="form-group">
+        <label for="nueva_contraseña">Nueva Contraseña:</label>
+        <input type="password" class="form-control" id="nueva_contraseña" name="nueva_contraseña" required minlength="6" placeholder="Ingrese la nueva contraseña">
+      </div>
+      <div class="form-group">
+        <label for="confirmar_contraseña">Confirmar Contraseña:</label>
+        <input type="password" class="form-control" id="confirmar_contraseña" name="confirmar_contraseña" required minlength="6" placeholder="Repita la nueva contraseña">
+      </div>
+      <button type="submit" class="btn btn-primary">Cambiar Contraseña</button>
+      <a href="{{ url_for('admin_users') }}" class="btn btn-secondary" id="backBtn">Volver</a>
+    </form>
+  </div>
+  
+  <!-- Bootstrap JS y dependencias -->
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  <script>
+    // Validar que las contraseñas coincidan y confirmar la acción antes de enviar el formulario
+    document.getElementById("changePasswordForm").addEventListener("submit", function(e) {
+      var nuevaContraseña = document.getElementById("nueva_contraseña").value;
+      var confirmarContraseña = document.getElementById("confirmar_contraseña").value;
+      if(nuevaContraseña !== confirmarContraseña) {
+        alert("Las contraseñas no coinciden. Por favor, verifique.");
+        e.preventDefault();
+        return;
+      }
+      if(!confirm("¿Está seguro de cambiar la contraseña?")) {
+        e.preventDefault();
+      }
+    });
+
+    // Confirmación para el botón de "Volver"
+    document.getElementById("backBtn").addEventListener("click", function(e) {
+      if(!confirm("¿Está seguro de volver? Se perderán los cambios.")) {
+        e.preventDefault();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Configuración Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Bootstrap CSS (opcional para diseño responsivo) -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  </head>
+  <body>
+    <div class="container my-4">
+      <!-- Botón para volver al Dashboard -->
+      <div class="mb-3">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-primary" onclick="if(!confirm('¿Está seguro de volver al Dashboard?')) return false;">Volver al Dashboard</a>
+      </div>
+      
+      <h1 class="mb-4">Configuración</h1>
+
+      <!-- Sección 1: Parámetros del Examen -->
+      <div class="card mb-3">
+        <div class="card-header">
+          Parámetros del Examen
+        </div>
+        <div class="card-body">
+          <form id="examParamsForm" action="{{ url_for('guardar_parametros_examen') }}" method="post">
+            <div class="form-group">
+              <label for="num_preguntas">Número de Preguntas:</label>
+              <input type="number" class="form-control" id="num_preguntas" name="num_preguntas" placeholder="Ej: 30" 
+                     value="{{ config_data.get('exam_params', {}).get('num_preguntas', '') }}" required>
+            </div>
+            <div class="form-group">
+              <label for="tiempo_limite">Tiempo Límite (min):</label>
+              <input type="number" class="form-control" id="tiempo_limite" name="tiempo_limite" placeholder="Tiempo límite (minutos)" 
+                     value="{{ config_data.get('exam_params', {}).get('tiempo_limite', '') }}" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar Parámetros</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Sección 2: Respaldo y Restauración de la Base de Datos -->
+      <div class="card mb-3">
+        <div class="card-header">
+          Respaldo / Restauración de BD
+        </div>
+        <div class="card-body">
+          <!-- Botón para respaldar la BD -->
+          <div class="mb-3">
+            <a href="{{ url_for('respaldar_bd') }}" class="btn btn-secondary" onclick="if(!confirm('¿Está seguro de respaldar la base de datos?')) return false; alert('Se ha generado el respaldo. Si el navegador no muestra el diálogo de descarga, revisa tus notificaciones.');">Respaldar BD</a>
+          </div>
+          <!-- Formulario para restaurar la BD -->
+          <form id="restaurarBDForm" action="{{ url_for('restaurar_bd') }}" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+              <label for="backup_file">Selecciona el archivo de respaldo:</label>
+              <input type="file" class="form-control-file" id="backup_file" name="backup_file" accept=".db" required>
+            </div>
+            <button type="submit" class="btn btn-secondary" onclick="if(!confirm('¿Está seguro de restaurar la base de datos? Esta acción sobrescribirá la BD actual.')) return false; alert('Se restaurará la base de datos.');">Restaurar BD</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Sección 3: Configuración de Temas -->
+      <div class="card mb-3">
+        <div class="card-header">
+          Configuración de Temas
+        </div>
+        <div class="card-body">
+          <form id="temaForm" action="{{ url_for('aplicar_tema') }}" method="post">
+            <div class="form-group">
+              <label for="tema">Tema:</label>
+              <select class="form-control" id="tema" name="tema">
+                <option value="Claro" {% if config_data.get('tema') == "Claro" %}selected{% endif %}>Claro</option>
+                <option value="Oscuro" {% if config_data.get('tema') == "Oscuro" %}selected{% endif %}>Oscuro</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary" onclick="if(!confirm('¿Está seguro de aplicar el tema seleccionado?')) return false; alert('Se aplicará el tema seleccionado.');">Aplicar Tema</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Sección 4: Registros de Actividad -->
+      <div class="card mb-3">
+        <div class="card-header">
+          Registros de Actividad
+        </div>
+        <div class="card-body">
+          <a href="{{ url_for('abrir_logs') }}" class="btn btn-info" onclick="if(!confirm('¿Está seguro de abrir los registros de actividad?')) return false; alert('Abriendo registros...');">Abrir Registros</a>
+        </div>
+      </div>
+
+      <!-- Sección 5: Configuración de Notificaciones -->
+      <div class="card mb-3">
+        <div class="card-header">
+          Configuración de Notificaciones
+        </div>
+        <div class="card-body">
+          <form id="notificacionesForm" action="{{ url_for('guardar_notificaciones') }}" method="post">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="notificaciones" name="notificaciones" 
+                     {% if config_data.get('notificaciones', {}).get('habilitado') %}checked{% endif %}>
+              <label class="form-check-label" for="notificaciones">
+                Habilitar Notificaciones por Correo
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="correo_notif">Correo para notificaciones:</label>
+              <input type="email" class="form-control" id="correo_notif" name="correo_notif" placeholder="Correo para notificaciones" 
+                     value="{{ config_data.get('notificaciones', {}).get('correo', '') }}">
+            </div>
+            <button type="submit" class="btn btn-primary" onclick="if(!confirm('¿Está seguro de guardar la configuración de notificaciones?')) return false; alert('Notificaciones guardadas.');">Guardar Notificaciones</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Sección 6: Sincronización de Preguntas -->
+      <div class="card mb-3">
+        <div class="card-header">
+          Sincronización de Preguntas
+        </div>
+        <div class="card-body">
+          <a href="{{ url_for('sincronizar_preguntas') }}" class="btn btn-warning" onclick="if(!confirm('¿Está seguro de actualizar las preguntas?')) return false; alert('Sincronizando preguntas...');">Actualizar Preguntas</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inclusión de Bootstrap JS y dependencias (opcional) -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script>
+      // Validaciones y confirmaciones para examParamsForm
+      document.getElementById('examParamsForm')?.addEventListener('submit', function(e) {
+        console.log('Guardando parámetros del examen...');
+        var numPreguntas = document.getElementById('num_preguntas').value;
+        var tiempoLimite = document.getElementById('tiempo_limite').value;
+        if (numPreguntas <= 0) {
+          alert("El número de preguntas debe ser mayor que 0.");
+          e.preventDefault();
+          return;
+        }
+        if (tiempoLimite <= 0) {
+          alert("El tiempo límite debe ser mayor que 0.");
+          e.preventDefault();
+          return;
+        }
+        if (!confirm("¿Está seguro de guardar los parámetros del examen?")) {
+          e.preventDefault();
+          return;
+        }
+      });
+
+      // Validación para restaurarBDForm
+      document.getElementById('restaurarBDForm')?.addEventListener('submit', function(e) {
+        console.log('Restaurando base de datos...');
+        if (!confirm("¿Está seguro de restaurar la base de datos? Esta acción sobrescribirá la BD actual.")) {
+          e.preventDefault();
+          return;
+        }
+      });
+
+      // Validación para temaForm
+      document.getElementById('temaForm')?.addEventListener('submit', function(e) {
+        console.log('Aplicando tema...');
+        if (!confirm("¿Está seguro de aplicar el tema seleccionado?")) {
+          e.preventDefault();
+          return;
+        }
+      });
+
+      // Validación para notificacionesForm
+      document.getElementById('notificacionesForm')?.addEventListener('submit', function(e) {
+        console.log('Guardando configuración de notificaciones...');
+        var correo = document.getElementById('correo_notif').value;
+        if (correo.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+          alert("Por favor ingrese un correo válido.");
+          e.preventDefault();
+          return;
+        }
+        if (!confirm("¿Está seguro de guardar la configuración de notificaciones?")) {
+          e.preventDefault();
+          return;
+        }
+      });
+    </script>
+  </body>
+</html>

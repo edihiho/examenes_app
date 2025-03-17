@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel de Administración</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Bootstrap CSS para estilos responsivos -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+      body {
+        background-color: #f7f7f7;
+        font-family: Arial, sans-serif;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container mt-4">
+      <div class="text-center mb-4">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="100">
+        <h1>Panel de Administración</h1>
+        <p>Bienvenido, {{ usuario.nombre }} ({{ usuario.tipo_usuario }})</p>
+      </div>
+
+      <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+        <li class="nav-item">
+          <a class="nav-link {% if active_tab == 'usuarios' %}active{% endif %}" id="usuarios-tab" data-toggle="tab" href="#usuarios" role="tab">Usuarios</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if active_tab == 'preguntas' %}active{% endif %}" id="preguntas-tab" data-toggle="tab" href="#preguntas" role="tab">Preguntas</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if active_tab == 'estadisticas' %}active{% endif %}" id="estadisticas-tab" data-toggle="tab" href="#estadisticas" role="tab">Estadísticas</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if active_tab == 'config' %}active{% endif %}" id="config-tab" data-toggle="tab" href="#config" role="tab">Configuración</a>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="adminTabsContent">
+        <div class="tab-pane fade {% if active_tab == 'usuarios' %}show active{% endif %}" id="usuarios" role="tabpanel">
+          {% include 'admin_users.html' %}
+        </div>
+        <div class="tab-pane fade {% if active_tab == 'preguntas' %}show active{% endif %}" id="preguntas" role="tabpanel">
+          {% include 'admin_questions.html' %}
+        </div>
+        <div class="tab-pane fade {% if active_tab == 'estadisticas' %}show active{% endif %}" id="estadisticas" role="tabpanel">
+          {% include 'admin_statistics.html' %}
+        </div>
+        <div class="tab-pane fade {% if active_tab == 'config' %}show active{% endif %}" id="config" role="tabpanel">
+          {% include 'admin_config.html' %}
+        </div>
+      </div>
+
+      <div class="mt-4 text-center">
+        <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
+      </div>
+    </div>
+
+    <!-- Inclusión de jQuery, Popper.js y Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script>
+      // Funciones específicas para cada pestaña. Aquí podrás implementar las funcionalidades correspondientes.
+      function loadUsuarios() {
+        console.log("Cargando funcionalidades de Usuarios");
+        // Ejemplo: Realizar una petición AJAX para obtener la lista de usuarios
+      }
+
+      function loadPreguntas() {
+        console.log("Cargando funcionalidades de Preguntas");
+        // Ejemplo: Realizar una petición AJAX para obtener las preguntas
+      }
+
+      function loadEstadisticas() {
+        console.log("Cargando estadísticas");
+        // Ejemplo: Realizar una petición AJAX para obtener las estadísticas
+      }
+
+      function loadConfig() {
+        console.log("Cargando configuración");
+        // Ejemplo: Realizar una petición AJAX para obtener la configuración actual
+      }
+
+      // Al cambiar de pestaña, guardamos la pestaña activa y llamamos a la función correspondiente.
+      $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+        var target = $(e.target).attr('href');
+        localStorage.setItem('activeTab', target);
+        switch(target) {
+          case '#usuarios':
+            loadUsuarios();
+            break;
+          case '#preguntas':
+            loadPreguntas();
+            break;
+          case '#estadisticas':
+            loadEstadisticas();
+            break;
+          case '#config':
+            loadConfig();
+            break;
+        }
+      });
+
+      // Al cargar la página, se restaura la pestaña activa y se ejecuta su funcionalidad.
+      var savedTab = localStorage.getItem('activeTab');
+      if (savedTab) {
+        $('#adminTabs a[href="' + savedTab + '"]').tab('show');
+        switch(savedTab) {
+          case '#usuarios':
+            loadUsuarios();
+            break;
+          case '#preguntas':
+            loadPreguntas();
+            break;
+          case '#estadisticas':
+            loadEstadisticas();
+            break;
+          case '#config':
+            loadConfig();
+            break;
+        }
+      } else {
+        // Si no hay pestaña guardada, se carga por defecto la de Usuarios.
+        loadUsuarios();
+      }
+    </script>
+  </body>
+</html>

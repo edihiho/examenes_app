@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login Cuestionario</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <style>
+    /* Estilos personalizados para imitar el QFrame y el diseño original */
+    .login-card {
+      border: 2px solid #0056b3;
+      border-radius: 10px;
+      background-color: #ffffff;
+      padding: 30px;
+      max-width: 400px;
+      margin: 50px auto;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: transform 0.2s ease;
+    }
+    .login-card:hover {
+      transform: scale(1.02);
+    }
+    .login-logo img {
+      max-width: 300px;
+      height: auto;
+    }
+    .login-title {
+      font-style: italic;
+      font-weight: bold;
+      color: #0056b3;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Mensajes flash (si existen) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-4">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'warning' if category == 'error' else category }}" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    
+    <div class="login-card">
+      <div class="login-logo text-center mb-3">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+      </div>
+      <h4 class="login-title text-center">Ingrese sus credenciales</h4>
+      <!-- El formulario envía a la ruta 'login' definida en app.py -->
+      <form action="{{ url_for('login') }}" method="post" id="loginForm">
+        <div class="form-group">
+          <input type="email" name="correo" class="form-control" placeholder="Correo" required>
+        </div>
+        <div class="form-group">
+          <input type="password" name="contraseña" class="form-control" placeholder="Contraseña" required minlength="6">
+        </div>
+        <div class="text-center">
+          <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Bootstrap JS y dependencias -->
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  <script>
+    // Se deja el listener listo por si en el futuro se desea agregar confirmación en el envío,
+    // aunque normalmente en login no se requiere confirmación adicional.
+    document.getElementById("loginForm").addEventListener("submit", function(e) {
+      // Ejemplo opcional:
+      // if (!confirm("¿Está seguro de iniciar sesión?")) { e.preventDefault(); }
+    });
+  </script>
+</body>
+</html>
