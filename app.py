@@ -595,8 +595,12 @@ def create_app():
 
     return app
 
+    # ... (todo el código de rutas y funciones que ya tienes)
+
+    # Importante: crea la aplicación a nivel global para que Gunicorn la encuentre.
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
     # Detecta el entorno: 'development' para local, 'production' (u otro) para producción.
     env = os.getenv('FLASK_ENV', 'production').lower()
 
@@ -612,3 +616,4 @@ if __name__ == '__main__':
         debug = False  # Modo debug desactivado en producción
 
     app.run(host=host, port=port, debug=debug)
+
