@@ -604,12 +604,11 @@ if __name__ == '__main__':
         # Configuración para desarrollo local
         host = os.getenv('FLASK_RUN_HOST', '127.0.0.1')
         port = int(os.getenv('FLASK_RUN_PORT', 5000))
-        debug = True  # En desarrollo se activa el modo debug
+        debug = True  # Modo debug activado en desarrollo
     else:
         # Configuración para producción
         host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
         port = int(os.getenv('FLASK_RUN_PORT', 8000))
-        debug = False  # Desactivar debug en producción
+        debug = False  # Modo debug desactivado en producción
 
     app.run(host=host, port=port, debug=debug)
-
