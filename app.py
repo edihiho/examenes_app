@@ -85,7 +85,7 @@ def create_app():
                 return redirect(url_for('login'))
             usuario = AuthController.login(correo, contraseña)
             if usuario:
-                # Aseguramos que el ID sea entero para construir la URL correctamente
+                # Aseguramos que el ID se almacene como entero para construir correctamente la URL
                 session['usuario'] = {
                     'id': int(usuario.id),
                     'nombre': usuario.nombre,
@@ -158,6 +158,53 @@ def create_app():
                 flash("Error al actualizar la contraseña.", "error")
                 return redirect(url_for('cambiar_contraseña', user_id=user_id))
         return render_template('cambiar_contrasena.html', user_id=user_id)
+
+    # --- EXAMEN PARA USUARIOS NO ADMIN ---
+    @app.route('/examen', methods=['GET', 'POST'])
+    def examen_view():
+        usuario = session.get('usuario')
+        if not usuario:
+            flash("Debe iniciar sesión.", "error")
+            return redirect(url_for('login'))
+        config_data = load_app_config()
+        if request.method == 'GET':
+            if 'examen_id' not in session or 'preguntas_examen' not in session:
+                examen_id = crear_examen(usuario['id'])
+                if examen_id is None:
+                    flash("Error al crear el examen.", "error")
+                    return redirect(url_for('examen_view'))
+                session['examen_id'] = examen_id
+                session['examen_start'] = time.time()
+                all_preguntas = PreguntaController.obtener_preguntas_completas_por_tipo(usuario.get('tipo_usuario'))
+                random.shuffle(all_preguntas)
+                max_preguntas = config_data.get('exam_params', {}).get('num_preguntas', len(all_preguntas))
+                session['preguntas_examen'] = all_preguntas[:max_preguntas]
+            preguntas = session.get('preguntas_examen', [])
+            return render_template('examen_view.html', usuario=usuario, preguntas=preguntas, config_data=config_data)
+        else:
+            examen_id = session.get('examen_id')
+            if not examen_id:
+                flash("No se encontró el examen en sesión.", "error")
+                return redirect(url_for('examen_view'))
+            examen_start = session.get('examen_start')
+            duration = int(time.time() - examen_start) if examen_start else 0
+            actualizar_duracion_examen(examen_id, duration)
+            preguntas = session.get('preguntas_examen', [])
+            for pregunta in preguntas:
+                opcion_id = request.form.get(f"respuesta_{pregunta['id']}")
+                if opcion_id:
+                    PreguntaController.guardar_respuesta(examen_id, pregunta['id'], opcion_id)
+            flash("Respuestas enviadas correctamente.", "success")
+            session.pop('examen_id', None)
+            session.pop('examen_start', None)
+            session.pop('preguntas_examen', None)
+            return redirect(url_for('resultados_view', exam_id=examen_id))
+
+    # --- RESULTADOS Y ESTADÍSTICAS DEL EXAMEN ACTUAL ---
+    @app.route('/resultados/<int:exam_id>')
+    def resultados_view(exam_id):
+        stats = EstadisticasController.obtener_estadisticas_examen(exam_id)
+        return render_template('resultados_view.html', exam_id=exam_id, stats=stats)
 
     # --- GUARDAR PARÁMETROS DEL EXAMEN ---
     @app.route('/admin/config/guardar', methods=['POST'])
