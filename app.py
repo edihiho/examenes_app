@@ -418,7 +418,7 @@ def create_app():
         Interfaz para filtrar por usuario y ver, para cada examen, las preguntas
         incorrectas junto con la respuesta seleccionada y la respuesta correcta.
         Se espera un parámetro 'usuario_id' en la URL.
-        Ejemplo: /admin/resumen_usuario?usuario_id=2
+        Ejemplo: /admin/resumen_examen_usuario?usuario_id=2
         """
         # Verificar que el usuario autenticado sea admin
         admin = session.get('usuario')
@@ -513,7 +513,8 @@ def create_app():
                 "preguntas": info["preguntas"]
             })
         
-        return render_template("resumen_usuario.html", resumen=resumen_list, usuario_id=usuario_id)
+        # Se pasa también la variable 'usuario' obtenida de la sesión
+        return render_template("resumen_usuario.html", resumen=resumen_list, usuario_id=usuario_id, usuario=session.get('usuario'))
     
     @app.route('/admin/exportar_excel_resumen')
     def exportar_excel_resumen():
