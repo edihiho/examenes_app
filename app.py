@@ -38,11 +38,22 @@ def crear_examen(usuario_id):
     Se asume que la columna 'fecha' tiene DEFAULT CURRENT_TIMESTAMP.
     """
     conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO examenes (usuario_id) VALUES (?)", (usuario_id,))
+        if os.getenv("DATABASE_URL"):
+            # Si estamos en PostgreSQL, usamos %s y RETURNING id
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = "INSERT INTO examenes (usuario_id) VALUES (%s) RETURNING id"
+            cursor.execute(query, (usuario_id,))
+            exam_id = cursor.fetchone()["id"]
+        else:
+            # En SQLite usamos el placeholder ?
+            cursor = conn.cursor()
+            query = "INSERT INTO examenes (usuario_id) VALUES (?)"
+            cursor.execute(query, (usuario_id,))
+            exam_id = cursor.lastrowid
         conn.commit()
-        return cursor.lastrowid
+        return exam_id
     except Exception as e:
         print("Error al crear examen:", e)
         conn.rollback()
