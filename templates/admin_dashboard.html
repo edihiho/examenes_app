@@ -34,6 +34,9 @@
           <a class="nav-link {% if active_tab == 'estadisticas' %}active{% endif %}" id="estadisticas-tab" data-toggle="tab" href="#estadisticas" role="tab">Estadísticas</a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if active_tab == 'resumen' %}active{% endif %}" id="resumen-tab" data-toggle="tab" href="#resumen" role="tab">Resumen Exámenes</a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if active_tab == 'config' %}active{% endif %}" id="config-tab" data-toggle="tab" href="#config" role="tab">Configuración</a>
         </li>
       </ul>
@@ -47,6 +50,10 @@
         </div>
         <div class="tab-pane fade {% if active_tab == 'estadisticas' %}show active{% endif %}" id="estadisticas" role="tabpanel">
           {% include 'admin_statistics.html' %}
+        </div>
+        <div class="tab-pane fade {% if active_tab == 'resumen' %}show active{% endif %}" id="resumen" role="tabpanel">
+          <!-- Aquí se incluirá la interfaz del resumen de exámenes -->
+          {% include 'admin_resumen_examen.html' %}
         </div>
         <div class="tab-pane fade {% if active_tab == 'config' %}show active{% endif %}" id="config" role="tabpanel">
           {% include 'admin_config.html' %}
@@ -63,7 +70,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
     <script>
-      // Funciones específicas para cada pestaña. Aquí podrás implementar las funcionalidades correspondientes.
+      // Funciones específicas para cada pestaña
       function loadUsuarios() {
         console.log("Cargando funcionalidades de Usuarios");
         // Ejemplo: Realizar una petición AJAX para obtener la lista de usuarios
@@ -77,6 +84,11 @@
       function loadEstadisticas() {
         console.log("Cargando estadísticas");
         // Ejemplo: Realizar una petición AJAX para obtener las estadísticas
+      }
+
+      function loadResumen() {
+        console.log("Cargando resumen de exámenes");
+        // Ejemplo: Realizar una petición AJAX para obtener el resumen de exámenes
       }
 
       function loadConfig() {
@@ -98,6 +110,9 @@
           case '#estadisticas':
             loadEstadisticas();
             break;
+          case '#resumen':
+            loadResumen();
+            break;
           case '#config':
             loadConfig();
             break;
@@ -117,6 +132,9 @@
             break;
           case '#estadisticas':
             loadEstadisticas();
+            break;
+          case '#resumen':
+            loadResumen();
             break;
           case '#config':
             loadConfig();
