@@ -7,93 +7,83 @@
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
     <style>
-      /* Header fijo */
-      .fixed-header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        background-color: #f7f7f7;
-        z-index: 1000;
-        border-bottom: 1px solid #ccc;
-        padding: 10px 0;
-      }
-      .fixed-header .header-content {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 0 15px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-      /* Margen superior para el contenido para que no se oculte detrás del header */
+      /* Centrado general y márgenes */
       .content-wrapper {
-        margin-top: 100px;
+        margin: 30px auto;
+        max-width: 1200px;
       }
-      /* Centrar contenido de las tarjetas */
-      .card-header, .card-body, .table {
+      /* Encabezado centrado */
+      .page-header {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      /* Estilos para la tabla */
+      .table thead th, .table tbody td {
+        vertical-align: middle;
         text-align: center;
       }
-      .table thead th {
+      /* Estilos para los botones de acción */
+      .action-buttons {
         text-align: center;
+        margin-bottom: 20px;
       }
     </style>
   </head>
   <body>
-    <!-- Header fijo con título y botones -->
-    <div class="fixed-header">
-      <div class="header-content">
-        <div>
-          <h3 class="mb-0">
-            Resumen del Examen para el Usuario {{ usuario.id }} - 
-            {% if usuario.nombre %}
-              {{ usuario.nombre }}
-            {% elif usuario.correo %}
-              {{ usuario.correo }}
-            {% else %}
-              Sin nombre
-            {% endif %}
-          </h3>
-        </div>
-        <div>
-          <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success">Exportar a Excel</a>
-          <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Contenido principal -->
     <div class="container content-wrapper">
-      <!-- Formulario para filtrar -->
-      <div class="row justify-content-center mb-4">
-        <div class="col-md-8">
-          <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="form-inline justify-content-center">
-            <div class="form-group mr-3">
-              <label for="usuario_id" class="mr-2 font-weight-bold">Usuario ID:</label>
-              <input type="number" name="usuario_id" id="usuario_id" class="form-control" placeholder="Ej. 3" required>
-            </div>
-            <div class="form-group mr-3">
-              <label for="exam_id" class="mr-2 font-weight-bold">Examen ID (opcional):</label>
-              <input type="number" name="exam_id" id="exam_id" class="form-control" placeholder="Ej. 15">
-            </div>
-            <button type="submit" class="btn btn-primary">Filtrar</button>
-          </form>
-        </div>
+      <!-- Encabezado con el título que muestra el ID y el nombre o correo del usuario -->
+      <div class="page-header">
+        <h3>
+          Resumen del Examen para el Usuario {{ usuario.id }} - 
+          {% if usuario.nombre %}
+            {{ usuario.nombre }}
+          {% elif usuario.correo %}
+            {{ usuario.correo }}
+          {% else %}
+            Sin nombre
+          {% endif %}
+        </h3>
       </div>
-
-      <!-- Resultados -->
+      
+      <!-- Botones de acción (Exportar y Volver al Dashboard) -->
+      <div class="action-buttons mb-4">
+        <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success mr-2">
+          Exportar a Excel
+        </a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary mr-2">
+          Volver al Dashboard
+        </a>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">
+          Cerrar Sesión
+        </a>
+      </div>
+      
+      <!-- Formulario de filtro -->
+      <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="form-inline justify-content-center mb-4">
+        <div class="form-group mr-3">
+          <label for="usuario_id" class="mr-2 font-weight-bold">Usuario ID:</label>
+          <input type="number" name="usuario_id" id="usuario_id" class="form-control" placeholder="Ej. 3" required>
+        </div>
+        <div class="form-group mr-3">
+          <label for="exam_id" class="mr-2 font-weight-bold">Examen ID (opcional):</label>
+          <input type="number" name="exam_id" id="exam_id" class="form-control" placeholder="Ej. 15">
+        </div>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+      </form>
+      
+      <!-- Resultados del resumen -->
       {% if resumen %}
         {% for exam in resumen %}
           <div class="card mb-4">
             <div class="card-header">
-              Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }} 
+              Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }}
               {% if exam.usuario_nombre %}
                 - Usuario: {{ exam.usuario_nombre }}
               {% endif %}
             </div>
             <div class="card-body">
               <div class="table-responsive">
-                <table class="table table-bordered mx-auto">
+                <table class="table table-bordered">
                   <thead class="thead-light">
                     <tr>
                       <th>ID Pregunta</th>
@@ -120,13 +110,8 @@
       {% else %}
         <p class="text-center text-muted">No se encontraron datos para el resumen.</p>
       {% endif %}
-
-      <!-- Botón para volver al Dashboard -->
-      <div class="text-center mt-4">
-        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Volver al Dashboard</a>
-      </div>
     </div>
-
+    
     <!-- Inclusión de jQuery, Popper.js y Bootstrap JS -->
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
