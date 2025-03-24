@@ -415,10 +415,12 @@ def create_app():
     @app.route('/admin/resumen_examen_usuario', methods=['GET'])
     def resumen_examen_usuario():
         """
-        Interfaz para filtrar por usuario y ver, para cada examen, las preguntas incorrectas junto con la respuesta seleccionada y la respuesta correcta.
-        Se espera un parámetro 'usuario_id' en la URL.
-        Ejemplo: /admin/resumen_examen_usuario?usuario_id=2&exam_id=...
+        Interfaz para filtrar por usuario y, opcionalmente, por examen,
+        para ver las preguntas incorrectas junto con la respuesta seleccionada y la respuesta correcta.
+        Se espera un parámetro 'usuario_id' en la URL y opcionalmente 'exam_id'.
+        Ejemplo: /admin/resumen_examen_usuario?usuario_id=3&exam_id=2
         """
+        # Verificar que el usuario autenticado sea admin
         admin = session.get('usuario')
         if not admin or admin.get('rol') != 'admin':
             flash("Acceso denegado.", "error")
@@ -429,11 +431,21 @@ def create_app():
             flash("Debes indicar un usuario a consultar.", "error")
             return redirect(url_for('admin_dashboard'))
         
-        # Definir filtered_usuario por defecto
-        filtered_usuario = {}
-        
+        # Obtener exam_id de forma opcional; si está vacío se ignora
+        exam_id_filter = request.args.get('exam_id')
+        if exam_id_filter and exam_id_filter.strip() != "":
+            try:
+                exam_id_filter = int(exam_id_filter)
+            except ValueError:
+                flash("El examen ID debe ser un número válido.", "error")
+                return redirect(url_for('admin_dashboard'))
+        else:
+            exam_id_filter = None
+
+        filtered_usuario = {}  # Valor por defecto
         conn = get_connection()
         try:
+            # Obtener la información del usuario filtrado
             if os.getenv("DATABASE_URL"):
                 import psycopg2.extras
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -444,9 +456,9 @@ def create_app():
             filtered_usuario = cursor.fetchone()
             if not filtered_usuario:
                 flash("Usuario no encontrado.", "error")
-                return redirect(url_for('admin_dashboard'))
+                filtered_usuario = {"id": usuario_id, "nombre": "No encontrado", "correo": ""}
             
-            # Consulta para obtener el resumen de exámenes
+            # Construir la consulta para obtener el resumen de exámenes
             if os.getenv("DATABASE_URL"):
                 import psycopg2.extras
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -467,9 +479,11 @@ def create_app():
                     JOIN opciones o1 ON r.opcion_id = o1.id
                     WHERE e.usuario_id = %s
                     AND o1.es_correcta = false
-                    ORDER BY e.fecha DESC, p.id
                 """
                 params = [usuario_id]
+                if exam_id_filter is not None:
+                    query += " AND e.id = %s"
+                    params.append(exam_id_filter)
             else:
                 cursor = conn.cursor()
                 query = """
@@ -489,9 +503,12 @@ def create_app():
                     JOIN opciones o1 ON r.opcion_id = o1.id
                     WHERE e.usuario_id = ?
                     AND o1.es_correcta = 0
-                    ORDER BY e.fecha DESC, p.id
                 """
                 params = [usuario_id]
+                if exam_id_filter is not None:
+                    query += " AND e.id = ?"
+                    params.append(exam_id_filter)
+            query += " ORDER BY e.fecha DESC, p.id"
             cursor.execute(query, params)
             resultados = cursor.fetchall()
         except Exception as e:
@@ -501,6 +518,7 @@ def create_app():
         finally:
             conn.close()
         
+        # Agrupar resultados por examen
         resumen_por_examen = {}
         for r in resultados:
             exam_id = r['examen_id']
@@ -525,8 +543,7 @@ def create_app():
             })
         
         return render_template("resumen_usuario.html", resumen=resumen_list, usuario_id=usuario_id, filtered_usuario=filtered_usuario)
-
-    
+   
     @app.route('/admin/exportar_excel_resumen')
     def exportar_excel_resumen():
         """
