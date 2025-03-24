@@ -1,70 +1,103 @@
-<div class="mt-3">
-    <h3 class="text-center">Resumen del Examen para el Usuario {{ usuario.nombre }}</h3>
-    
-    <!-- Botón para exportar a Excel -->
-    <div class="text-center mb-3">
-      <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success">
-        Exportar a Excel
-      </a>
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Resumen de Exámenes por Usuario</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+      /* Estilos para fijar el header superior */
+      .fixed-top-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background-color: #f7f7f7;
+        z-index: 1050;
+        border-bottom: 1px solid #ccc;
+        padding: 10px 0;
+      }
+      .fixed-top-header h3,
+      .fixed-top-header .btn {
+        margin: 0 10px;
+      }
+      /* Agregar margen superior al contenido para que no quede oculto tras el header */
+      .content-container {
+        margin-top: 120px; /* Ajusta este valor según la altura de tu header fijo */
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header fijo -->
+    <div class="fixed-top-header text-center">
+      <h3 class="d-inline">Resumen del Examen para el Usuario {{ usuario.nombre }}</h3>
+      <div class="d-inline">
+        <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success">Exportar a Excel</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Volver al Dashboard</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
+      </div>
     </div>
-    
-    <!-- Formulario para filtrar por usuario y examen -->
-    <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="form-inline justify-content-center mb-3">
-      <div class="form-group mr-2">
-        <label for="usuario_id" class="mr-2">Usuario ID:</label>
-        <input type="number" name="usuario_id" id="usuario_id" class="form-control" required>
-      </div>
-      <div class="form-group mr-2">
-        <label for="exam_id" class="mr-2">Examen ID (opcional):</label>
-        <input type="number" name="exam_id" id="exam_id" class="form-control">
-      </div>
-      <button type="submit" class="btn btn-primary">Filtrar</button>
-    </form>
-    
-    {% if resumen %}
-      {% for exam in resumen %}
-        <div class="card mb-3">
-          <div class="card-header text-center">
-            Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }} 
-            {% if exam.usuario_nombre %}
-              - Usuario: {{ exam.usuario_nombre }}
-            {% endif %}
-          </div>
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-bordered mx-auto">
-                <thead class="thead-light">
-                  <tr>
-                    <th>ID Pregunta</th>
-                    <th>Pregunta</th>
-                    <th>Respuesta Seleccionada</th>
-                    <th>Respuesta Correcta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for preg in exam.preguntas %}
+
+    <!-- Contenedor de contenido desplazable -->
+    <div class="container content-container">
+      <!-- Formulario para filtrar por usuario y examen -->
+      <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="form-inline justify-content-center mb-3">
+        <div class="form-group mr-2">
+          <label for="usuario_id" class="mr-2 font-weight-bold">Usuario ID:</label>
+          <input type="number" name="usuario_id" id="usuario_id" class="form-control" placeholder="Ej. 3" required>
+        </div>
+        <div class="form-group mr-2">
+          <label for="exam_id" class="mr-2 font-weight-bold">Examen ID (opcional):</label>
+          <input type="number" name="exam_id" id="exam_id" class="form-control" placeholder="Ej. 15">
+        </div>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+      </form>
+      
+      {% if resumen %}
+        {% for exam in resumen %}
+          <div class="card mb-3">
+            <div class="card-header text-center">
+              Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }} 
+              {% if exam.usuario_nombre %}
+                - Usuario: {{ exam.usuario_nombre }}
+              {% endif %}
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-bordered mx-auto">
+                  <thead class="thead-light">
                     <tr>
-                      <td class="text-center">{{ preg.pregunta_id }}</td>
-                      <td>{{ preg.pregunta }}</td>
-                      <td>{{ preg.respuesta_seleccionada }}</td>
-                      <td>{{ preg.respuesta_correcta }}</td>
+                      <th>ID Pregunta</th>
+                      <th>Pregunta</th>
+                      <th>Respuesta Seleccionada</th>
+                      <th>Respuesta Correcta</th>
                     </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {% for preg in exam.preguntas %}
+                      <tr>
+                        <td class="text-center">{{ preg.pregunta_id }}</td>
+                        <td>{{ preg.pregunta }}</td>
+                        <td>{{ preg.respuesta_seleccionada }}</td>
+                        <td>{{ preg.respuesta_correcta }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      {% endfor %}
-    {% else %}
-      <p class="text-center">No se encontraron datos para el resumen.</p>
-    {% endif %}
-    
-    <!-- Botón para volver al Dashboard -->
-    <div class="text-center mt-4">
-      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
-        Volver al Dashboard
-      </a>
+        {% endfor %}
+      {% else %}
+        <p class="text-center text-muted">No se encontraron datos para el resumen.</p>
+      {% endif %}
     </div>
-  </div>
-  
+
+    <!-- Inclusión de jQuery, Popper.js y Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  </body>
+</html>

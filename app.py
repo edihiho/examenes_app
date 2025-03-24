@@ -514,6 +514,118 @@ def create_app():
             })
         
         return render_template("resumen_usuario.html", resumen=resumen_list, usuario_id=usuario_id)
+    
+    @app.route('/admin/exportar_excel_resumen')
+    def exportar_excel_resumen():
+        """
+        Exporta a Excel un resumen de las preguntas incorrectas para un usuario específico.
+        Se esperan los siguientes parámetros de consulta:
+        - usuario_id: ID del usuario (requerido)
+        - exam_id: ID del examen (opcional)
+        El resumen incluye:
+        - Examen ID, Fecha, ID y enunciado de la pregunta,
+        - Respuesta Seleccionada, Respuesta Correcta y el nombre del usuario.
+        """
+        # Verificar que el administrador esté autenticado
+        usuario = session.get('usuario')
+        if not usuario or usuario.get('rol') != 'admin':
+            flash("Acceso denegado.", "error")
+            return redirect(url_for('login'))
+        
+        # Obtener parámetros de consulta
+        usuario_id = request.args.get('usuario_id')
+        if not usuario_id:
+            flash("Debe especificar un usuario para exportar.", "error")
+            return redirect(url_for('resumen_examen_usuario'))
+        
+        exam_id_filter = request.args.get('exam_id')
+        
+        conn = get_connection()
+        try:
+            if os.getenv("DATABASE_URL"):
+                # Uso de PostgreSQL
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                query = """
+                    SELECT 
+                        e.id AS examen_id,
+                        to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+                        p.id AS pregunta_id,
+                        p.pregunta,
+                        o1.opcion AS respuesta_seleccionada,
+                        (SELECT o2.opcion 
+                        FROM opciones o2 
+                        WHERE o2.pregunta_id = p.id AND o2.es_correcta = true
+                        LIMIT 1) AS respuesta_correcta,
+                        u.nombre AS usuario_nombre
+                    FROM respuestas r
+                    JOIN examenes e ON r.examen_id = e.id
+                    JOIN preguntas p ON r.pregunta_id = p.id
+                    JOIN opciones o1 ON r.opcion_id = o1.id
+                    JOIN usuarios u ON e.usuario_id = u.id
+                    WHERE e.usuario_id = %s AND o1.es_correcta = false
+                """
+                params = [usuario_id]
+                if exam_id_filter:
+                    query += " AND e.id = %s"
+                    params.append(exam_id_filter)
+            else:
+                # Uso de SQLite
+                cursor = conn.cursor()
+                query = """
+                    SELECT 
+                        e.id AS examen_id,
+                        datetime(e.fecha, 'localtime') AS fecha,
+                        p.id AS pregunta_id,
+                        p.pregunta,
+                        o1.opcion AS respuesta_seleccionada,
+                        (SELECT o2.opcion 
+                        FROM opciones o2 
+                        WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1
+                        LIMIT 1) AS respuesta_correcta,
+                        u.nombre AS usuario_nombre
+                    FROM respuestas r
+                    JOIN examenes e ON r.examen_id = e.id
+                    JOIN preguntas p ON r.pregunta_id = p.id
+                    JOIN opciones o1 ON r.opcion_id = o1.id
+                    JOIN usuarios u ON e.usuario_id = u.id
+                    WHERE e.usuario_id = ? AND o1.es_correcta = 0
+                """
+                params = [usuario_id]
+                if exam_id_filter:
+                    query += " AND e.id = ?"
+                    params.append(exam_id_filter)
+            query += " ORDER BY e.fecha DESC, p.id"
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+        except Exception as e:
+            print("Error al obtener resumen para exportación:", e)
+            rows = []
+        finally:
+            conn.close()
+        
+        # Crear un DataFrame con pandas
+        import pandas as pd
+        if rows:
+            df = pd.DataFrame(rows)
+        else:
+            df = pd.DataFrame(columns=["examen_id", "fecha", "pregunta_id", "pregunta", "respuesta_seleccionada", "respuesta_correcta", "usuario_nombre"])
+        
+        # Directorio temporal para guardar el archivo Excel
+        temp_dir = os.path.join(project_root, "temp")
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+        file_path = os.path.join(temp_dir, "resumen_examen.xlsx")
+        
+        with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Resumen")
+        
+        return send_file(
+            file_path,
+            as_attachment=True,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            download_name="resumen_examen.xlsx"
+    )
 
     # --- EXPORTAR ESTADÍSTICAS A EXCEL ---
     @app.route('/admin/exportar_excel')
