@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resumen del Examen por Usuario</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <h1>Resumen del Examen para el Usuario {{ usuario_id }}</h1>
+    {% if resumen %}
+        {% for exam in resumen %}
+            <h2>Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }}</h2>
+            <table border="1" cellpadding="5">
+                <thead>
+                    <tr>
+                        <th>ID Pregunta</th>
+                        <th>Pregunta</th>
+                        <th>Respuesta Seleccionada</th>
+                        <th>Respuesta Correcta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for preg in exam.preguntas %}
+                        <tr>
+                            <td>{{ preg.pregunta_id }}</td>
+                            <td>{{ preg.pregunta }}</td>
+                            <td>{{ preg.respuesta_seleccionada }}</td>
+                            <td>{{ preg.respuesta_correcta }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endfor %}
+    {% else %}
+        <p>No se encontró ningún examen con respuestas incorrectas para este usuario.</p>
+    {% endif %}
+    <a href="{{ url_for('admin_dashboard') }}">Volver al Dashboard</a>
+</body>
+</html>

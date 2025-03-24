@@ -411,6 +411,109 @@ def create_app():
                 flash("Debe seleccionar un archivo.", "error")
             return redirect(url_for('admin_questions'))
         return render_template('cargar_excel.html')
+    
+    @app.route('/admin/resumen_usuario', methods=['GET'])
+    def resumen_usuario():
+        """
+        Interfaz para filtrar por usuario y ver, para cada examen, las preguntas
+        incorrectas junto con la respuesta seleccionada y la respuesta correcta.
+        Se espera un parámetro 'usuario_id' en la URL.
+        Ejemplo: /admin/resumen_usuario?usuario_id=2
+        """
+        # Verificar que el usuario autenticado sea admin
+        admin = session.get('usuario')
+        if not admin or admin.get('rol') != 'admin':
+            flash("Acceso denegado.", "error")
+            return redirect(url_for('login'))
+        
+        usuario_id = request.args.get('usuario_id')
+        if not usuario_id:
+            flash("Debes indicar un usuario a consultar.", "error")
+            return redirect(url_for('admin_dashboard'))
+        
+        conn = get_connection()
+        try:
+            # Dependiendo del entorno, configurar el cursor y la consulta
+            if os.getenv("DATABASE_URL"):
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                query = """
+                    SELECT 
+                        e.id AS examen_id,
+                        to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+                        p.id AS pregunta_id,
+                        p.pregunta,
+                        o1.opcion AS respuesta_seleccionada,
+                        (SELECT o2.opcion 
+                        FROM opciones o2 
+                        WHERE o2.pregunta_id = p.id AND o2.es_correcta = true
+                        LIMIT 1) AS respuesta_correcta
+                    FROM respuestas r
+                    JOIN examenes e ON r.examen_id = e.id
+                    JOIN preguntas p ON r.pregunta_id = p.id
+                    JOIN opciones o1 ON r.opcion_id = o1.id
+                    WHERE e.usuario_id = %s
+                    AND o1.es_correcta = false
+                    ORDER BY e.fecha DESC, p.id
+                """
+                params = [usuario_id]
+            else:
+                cursor = conn.cursor()
+                query = """
+                    SELECT 
+                        e.id AS examen_id,
+                        datetime(e.fecha, 'localtime') AS fecha,
+                        p.id AS pregunta_id,
+                        p.pregunta,
+                        o1.opcion AS respuesta_seleccionada,
+                        (SELECT o2.opcion 
+                        FROM opciones o2 
+                        WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1
+                        LIMIT 1) AS respuesta_correcta
+                    FROM respuestas r
+                    JOIN examenes e ON r.examen_id = e.id
+                    JOIN preguntas p ON r.pregunta_id = p.id
+                    JOIN opciones o1 ON r.opcion_id = o1.id
+                    WHERE e.usuario_id = ?
+                    AND o1.es_correcta = 0
+                    ORDER BY e.fecha DESC, p.id
+                """
+                params = [usuario_id]
+            cursor.execute(query, params)
+            resultados = cursor.fetchall()
+        except Exception as e:
+            print("Error al obtener el resumen por usuario:", e)
+            flash("Ocurrió un error al obtener el resumen.", "error")
+            resultados = []
+        finally:
+            conn.close()
+        
+        # Agrupar resultados por examen para facilitar la visualización
+        resumen_por_examen = {}
+        for r in resultados:
+            exam_id = r['examen_id']
+            if exam_id not in resumen_por_examen:
+                resumen_por_examen[exam_id] = {
+                    "fecha": r['fecha'],
+                    "preguntas": []
+                }
+            resumen_por_examen[exam_id]["preguntas"].append({
+                "pregunta_id": r['pregunta_id'],
+                "pregunta": r['pregunta'],
+                "respuesta_seleccionada": r['respuesta_seleccionada'],
+                "respuesta_correcta": r['respuesta_correcta']
+            })
+        
+        # Convertir a lista para pasar al template
+        resumen_list = []
+        for exam_id, info in resumen_por_examen.items():
+            resumen_list.append({
+                "examen_id": exam_id,
+                "fecha": info["fecha"],
+                "preguntas": info["preguntas"]
+            })
+        
+        return render_template("resumen_usuario.html", resumen=resumen_list, usuario_id=usuario_id)
 
     # --- EXPORTAR ESTADÍSTICAS A EXCEL ---
     @app.route('/admin/exportar_excel')
@@ -419,48 +522,54 @@ def create_app():
         if not usuario or usuario.get('rol') != 'admin':
             flash("Acceso denegado.", "error")
             return redirect(url_for('login'))
+        # Recuperar el tipo de usuario del admin
+        tipo_usuario = usuario.get('tipo_usuario')
+        
         filtro_usuarios = request.args.get('usuario', '')
         filtro_fecha_inicio = request.args.get('fecha_inicio', '')
         filtro_fecha_fin = request.args.get('fecha_fin', '')
         conn = get_connection()
-        # Configurar cursor y query según entorno
         if os.getenv("DATABASE_URL"):
             import psycopg2.extras
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             query = """
-            SELECT u.nombre, u.localidad, e.id AS examen_id, 
-                to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
-                e.duracion,
-                (SELECT COUNT(*) FROM respuestas r 
-                    JOIN opciones o ON r.opcion_id = o.id
-                    WHERE r.examen_id = e.id AND o.es_correcta = true) AS correctas,
-                (SELECT COUNT(*) FROM respuestas r 
-                    JOIN opciones o ON r.opcion_id = o.id
-                    WHERE r.examen_id = e.id AND o.es_correcta = false) AS incorrectas
-            FROM examenes e
-            JOIN usuarios u ON e.usuario_id = u.id
-            WHERE u.rol = 'usuario'
+                SELECT u.nombre, u.localidad, e.id AS examen_id, 
+                    to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+                    e.duracion,
+                    (SELECT COUNT(*) FROM respuestas r 
+                        JOIN opciones o ON r.opcion_id = o.id
+                        WHERE r.examen_id = e.id AND o.es_correcta = true) AS correctas,
+                    (SELECT COUNT(*) FROM respuestas r 
+                        JOIN opciones o ON r.opcion_id = o.id
+                        WHERE r.examen_id = e.id AND o.es_correcta = false) AS incorrectas
+                FROM examenes e
+                JOIN usuarios u ON e.usuario_id = u.id
+                WHERE u.rol = 'usuario' AND u.tipo_usuario = %s
             """
+            placeholder = "%s"
+            params = [tipo_usuario]
         else:
             cursor = conn.cursor()
             query = """
-            SELECT u.nombre, u.localidad, e.id AS examen_id, 
-                datetime(e.fecha, 'localtime') AS fecha,
-                e.duracion,
-                (SELECT COUNT(*) FROM respuestas r 
-                    JOIN opciones o ON r.opcion_id = o.id
-                    WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
-                (SELECT COUNT(*) FROM respuestas r 
-                    JOIN opciones o ON r.opcion_id = o.id
-                    WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
-            FROM examenes e
-            JOIN usuarios u ON e.usuario_id = u.id
-            WHERE u.rol = 'usuario'
+                SELECT u.nombre, u.localidad, e.id AS examen_id, 
+                    datetime(e.fecha, 'localtime') AS fecha,
+                    e.duracion,
+                    (SELECT COUNT(*) FROM respuestas r 
+                        JOIN opciones o ON r.opcion_id = o.id
+                        WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
+                    (SELECT COUNT(*) FROM respuestas r 
+                        JOIN opciones o ON r.opcion_id = o.id
+                        WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
+                FROM examenes e
+                JOIN usuarios u ON e.usuario_id = u.id
+                WHERE u.rol = 'usuario' AND u.tipo_usuario = ?
             """
-        params = []
+            placeholder = "?"
+            params = [tipo_usuario]
+        
         if filtro_usuarios:
-            placeholders = ",".join("?" for _ in filtro_usuarios.split(',') if _)
-            query += f" AND u.nombre IN ({placeholders})"
+            ph = ",".join(placeholder for _ in filtro_usuarios.split(',') if _)
+            query += f" AND u.nombre IN ({ph})"
             params.extend([u.strip() for u in filtro_usuarios.split(',') if u.strip()])
         if filtro_fecha_inicio and filtro_fecha_fin:
             query += " AND e.fecha BETWEEN ? AND ?"
@@ -474,7 +583,6 @@ def create_app():
             total_preguntas = row["correctas"] + row["incorrectas"]
             nota_final = round((row["correctas"] / total_preguntas * 10) if total_preguntas > 0 else 0, 2)
             porcentaje = round((row["correctas"] / total_preguntas * 100) if total_preguntas > 0 else 0, 2)
-            # Calcular la duración en minutos (si hay valor numérico)
             duracion_min = round(row["duracion"] / 60, 2) if row["duracion"] is not None else "N/A"
             data.append({
                 "Usuario": row["nombre"],
@@ -500,7 +608,7 @@ def create_app():
             as_attachment=True,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             download_name="estadisticas.xlsx"
-        )   
+        )
 
     @app.route('/admin/grafica/calificacion')
     def grafica_calificacion():
@@ -510,9 +618,11 @@ def create_app():
         fecha_inicio = request.args.get('fecha_inicio', '').strip()
         fecha_fin = request.args.get('fecha_fin', '').strip()
         localidad = request.args.get('localidad', '').strip()
-
+        
+        # Recuperamos el tipo de usuario del admin (OYM o LABORATORIO)
+        tipo_usuario = session.get('usuario', {}).get('tipo_usuario')
+        
         conn = get_connection()
-        # Detectar entorno y configurar cursor y query
         if os.getenv("DATABASE_URL"):
             import psycopg2.extras
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -528,9 +638,10 @@ def create_app():
                         WHERE r.examen_id = e.id) AS total_respuestas
                 FROM examenes e
                 JOIN usuarios u ON e.usuario_id = u.id
-                WHERE 1=1
+                WHERE u.tipo_usuario = %s
             """
             placeholder = "%s"
+            params = [tipo_usuario]
         else:
             cursor = conn.cursor()
             query = """
@@ -545,11 +656,12 @@ def create_app():
                         WHERE r.examen_id = e.id) AS total_respuestas
                 FROM examenes e
                 JOIN usuarios u ON e.usuario_id = u.id
-                WHERE 1=1
+                WHERE u.tipo_usuario = ?
             """
             placeholder = "?"
+            params = [tipo_usuario]
         
-        params = []
+        # Agregar otros filtros si existen
         if lista_usuarios:
             ph = ",".join(placeholder for _ in lista_usuarios)
             query += f" AND u.nombre IN ({ph})"
@@ -569,26 +681,18 @@ def create_app():
         rows = cursor.fetchall()
         conn.close()
 
-        # Para depuración, imprimimos la cantidad de filas obtenidas
-        print("Filas obtenidas para gráfica de calificación:", len(rows))
-
         labels = []
         calificaciones = []
-        # Si no se obtuvieron filas, asignamos datos por defecto
         if not rows:
             labels.append("No hay datos")
             calificaciones.append(0)
         else:
-            # Iteramos sobre los registros y calculamos la calificación
             for row in rows:
                 total = row["total_respuestas"]
                 correct = row["correctas"]
-                # Si total es 0, se asigna 0; de lo contrario, se calcula la nota (escala de 10)
                 grade = round((correct / total) * 10, 2) if total > 0 else 0.0
                 labels.append(f"Examen {row['exam_id']} - {row['nombre']} - {row['fecha']}")
                 calificaciones.append(grade)
-            
-            # Si solo hay un registro, para evitar que la gráfica quede "plana", se puede duplicar el dato
             if len(rows) == 1:
                 labels *= 2
                 calificaciones *= 2
