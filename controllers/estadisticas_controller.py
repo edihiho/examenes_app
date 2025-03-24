@@ -1,4 +1,5 @@
 from config.database import get_connection
+import os
 
 class EstadisticasController:
     @staticmethod
@@ -12,23 +13,44 @@ class EstadisticasController:
           - Número de respuestas correctas e incorrectas
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        query = """
-        SELECT u.nombre,
-               e.id AS examen_id,
-               datetime(e.fecha, 'localtime') AS fecha,
-               e.duracion,
-               (SELECT COUNT(*) FROM respuestas r
-                JOIN opciones o ON r.opcion_id = o.id
-                WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
-               (SELECT COUNT(*) FROM respuestas r
-                JOIN opciones o ON r.opcion_id = o.id
-                WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
-        FROM examenes e
-        JOIN usuarios u ON e.usuario_id = u.id
-        WHERE u.tipo_usuario = ?
-        ORDER BY e.fecha DESC
-        """
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            # Usamos to_char para formatear la fecha en PostgreSQL
+            query = """
+            SELECT u.nombre,
+                   e.id AS examen_id,
+                   to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+                   e.duracion,
+                   (SELECT COUNT(*) FROM respuestas r
+                    JOIN opciones o ON r.opcion_id = o.id
+                    WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
+                   (SELECT COUNT(*) FROM respuestas r
+                    JOIN opciones o ON r.opcion_id = o.id
+                    WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
+            FROM examenes e
+            JOIN usuarios u ON e.usuario_id = u.id
+            WHERE u.tipo_usuario = %s
+            ORDER BY e.fecha DESC
+            """
+        else:
+            cursor = conn.cursor()
+            query = """
+            SELECT u.nombre,
+                   e.id AS examen_id,
+                   datetime(e.fecha, 'localtime') AS fecha,
+                   e.duracion,
+                   (SELECT COUNT(*) FROM respuestas r
+                    JOIN opciones o ON r.opcion_id = o.id
+                    WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
+                   (SELECT COUNT(*) FROM respuestas r
+                    JOIN opciones o ON r.opcion_id = o.id
+                    WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
+            FROM examenes e
+            JOIN usuarios u ON e.usuario_id = u.id
+            WHERE u.tipo_usuario = ?
+            ORDER BY e.fecha DESC
+            """
         cursor.execute(query, (tipo_usuario,))
         rows = cursor.fetchall()
         conn.close()
@@ -50,24 +72,45 @@ class EstadisticasController:
         Retorna los detalles de cada respuesta de cada examen para usuarios del tipo indicado.
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        query = """
-        SELECT u.nombre,
-               e.id AS examen_id,
-               datetime(e.fecha, 'localtime') AS fecha,
-               p.pregunta,
-               o1.opcion AS respuesta_seleccionada,
-               CASE WHEN o1.es_correcta = 1 THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
-               (SELECT o2.opcion FROM opciones o2 
-                WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1) AS respuesta_correcta
-        FROM examenes e
-        JOIN usuarios u ON e.usuario_id = u.id
-        JOIN respuestas r ON e.id = r.examen_id
-        JOIN preguntas p ON r.pregunta_id = p.id
-        JOIN opciones o1 ON r.opcion_id = o1.id
-        WHERE u.tipo_usuario = ?
-        ORDER BY e.fecha DESC, e.id, p.id
-        """
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = """
+            SELECT u.nombre,
+                   e.id AS examen_id,
+                   to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+                   p.pregunta,
+                   o1.opcion AS respuesta_seleccionada,
+                   CASE WHEN o1.es_correcta = 1 THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
+                   (SELECT o2.opcion FROM opciones o2 
+                    WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1) AS respuesta_correcta
+            FROM examenes e
+            JOIN usuarios u ON e.usuario_id = u.id
+            JOIN respuestas r ON e.id = r.examen_id
+            JOIN preguntas p ON r.pregunta_id = p.id
+            JOIN opciones o1 ON r.opcion_id = o1.id
+            WHERE u.tipo_usuario = %s
+            ORDER BY e.fecha DESC, e.id, p.id
+            """
+        else:
+            cursor = conn.cursor()
+            query = """
+            SELECT u.nombre,
+                   e.id AS examen_id,
+                   datetime(e.fecha, 'localtime') AS fecha,
+                   p.pregunta,
+                   o1.opcion AS respuesta_seleccionada,
+                   CASE WHEN o1.es_correcta = 1 THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
+                   (SELECT o2.opcion FROM opciones o2 
+                    WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1) AS respuesta_correcta
+            FROM examenes e
+            JOIN usuarios u ON e.usuario_id = u.id
+            JOIN respuestas r ON e.id = r.examen_id
+            JOIN preguntas p ON r.pregunta_id = p.id
+            JOIN opciones o1 ON r.opcion_id = o1.id
+            WHERE u.tipo_usuario = ?
+            ORDER BY e.fecha DESC, e.id, p.id
+            """
         cursor.execute(query, (tipo_usuario,))
         rows = cursor.fetchall()
         conn.close()
@@ -90,17 +133,31 @@ class EstadisticasController:
         Retorna las 5 preguntas con mayor número de respuestas incorrectas para el tipo de usuario especificado.
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        query = """
-        SELECT p.id, p.pregunta, COUNT(r.id) AS falladas
-        FROM preguntas p
-        LEFT JOIN respuestas r ON p.id = r.pregunta_id
-        LEFT JOIN opciones o ON r.opcion_id = o.id
-        WHERE p.tipo_usuario = ? AND o.es_correcta = 0
-        GROUP BY p.id
-        ORDER BY falladas DESC
-        LIMIT 5
-        """
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = """
+            SELECT p.id, p.pregunta, COUNT(r.id) AS falladas
+            FROM preguntas p
+            LEFT JOIN respuestas r ON p.id = r.pregunta_id
+            LEFT JOIN opciones o ON r.opcion_id = o.id
+            WHERE p.tipo_usuario = %s AND o.es_correcta = 0
+            GROUP BY p.id
+            ORDER BY falladas DESC
+            LIMIT 5
+            """
+        else:
+            cursor = conn.cursor()
+            query = """
+            SELECT p.id, p.pregunta, COUNT(r.id) AS falladas
+            FROM preguntas p
+            LEFT JOIN respuestas r ON p.id = r.pregunta_id
+            LEFT JOIN opciones o ON r.opcion_id = o.id
+            WHERE p.tipo_usuario = ? AND o.es_correcta = 0
+            GROUP BY p.id
+            ORDER BY falladas DESC
+            LIMIT 5
+            """
         cursor.execute(query, (tipo_usuario,))
         rows = cursor.fetchall()
         conn.close()
@@ -119,17 +176,31 @@ class EstadisticasController:
         Retorna las estadísticas totales de un usuario (acumulado de todos los exámenes).
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        query = """
-        SELECT
-          (SELECT COUNT(*) FROM examenes WHERE usuario_id = ?) AS total_examenes,
-          (SELECT COUNT(*) FROM respuestas r
-           JOIN opciones o ON r.opcion_id = o.id
-           WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = ?) AND o.es_correcta = 1) AS preguntas_correctas,
-          (SELECT COUNT(*) FROM respuestas r
-           JOIN opciones o ON r.opcion_id = o.id
-           WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = ?) AND o.es_correcta = 0) AS preguntas_incorrectas
-        """
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = """
+            SELECT
+              (SELECT COUNT(*) FROM examenes WHERE usuario_id = %s) AS total_examenes,
+              (SELECT COUNT(*) FROM respuestas r
+               JOIN opciones o ON r.opcion_id = o.id
+               WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = %s) AND o.es_correcta = 1) AS preguntas_correctas,
+              (SELECT COUNT(*) FROM respuestas r
+               JOIN opciones o ON r.opcion_id = o.id
+               WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = %s) AND o.es_correcta = 0) AS preguntas_incorrectas
+            """
+        else:
+            cursor = conn.cursor()
+            query = """
+            SELECT
+              (SELECT COUNT(*) FROM examenes WHERE usuario_id = ?) AS total_examenes,
+              (SELECT COUNT(*) FROM respuestas r
+               JOIN opciones o ON r.opcion_id = o.id
+               WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = ?) AND o.es_correcta = 1) AS preguntas_correctas,
+              (SELECT COUNT(*) FROM respuestas r
+               JOIN opciones o ON r.opcion_id = o.id
+               WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = ?) AND o.es_correcta = 0) AS preguntas_incorrectas
+            """
         cursor.execute(query, (usuario_id, usuario_id, usuario_id))
         row = cursor.fetchone()
         conn.close()
@@ -150,13 +221,23 @@ class EstadisticasController:
           - preguntas_incorrectas: total de respuestas incorrectas
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        query = """
-        SELECT 
-          (SELECT COUNT(*) FROM respuestas WHERE examen_id = ?) AS total_respuestas,
-          (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = ? AND o.es_correcta = 1) AS preguntas_correctas,
-          (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = ? AND o.es_correcta = 0) AS preguntas_incorrectas
-        """
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = """
+            SELECT 
+              (SELECT COUNT(*) FROM respuestas WHERE examen_id = %s) AS total_respuestas,
+              (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = %s AND o.es_correcta = 1) AS preguntas_correctas,
+              (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = %s AND o.es_correcta = 0) AS preguntas_incorrectas
+            """
+        else:
+            cursor = conn.cursor()
+            query = """
+            SELECT 
+              (SELECT COUNT(*) FROM respuestas WHERE examen_id = ?) AS total_respuestas,
+              (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = ? AND o.es_correcta = 1) AS preguntas_correctas,
+              (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = ? AND o.es_correcta = 0) AS preguntas_incorrectas
+            """
         cursor.execute(query, (exam_id, exam_id, exam_id))
         row = cursor.fetchone()
         conn.close()
@@ -179,19 +260,35 @@ class EstadisticasController:
           - respuesta_correcta: La opción correcta para la pregunta.
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        query = """
-        SELECT p.pregunta,
-               o1.opcion AS respuesta_seleccionada,
-               CASE WHEN o1.es_correcta = 1 THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
-               (SELECT o2.opcion FROM opciones o2 
-                WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1) AS respuesta_correcta
-        FROM respuestas r
-        JOIN preguntas p ON r.pregunta_id = p.id
-        LEFT JOIN opciones o1 ON r.opcion_id = o1.id
-        WHERE r.examen_id = ?
-        ORDER BY p.id
-        """
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = """
+            SELECT p.pregunta,
+                   o1.opcion AS respuesta_seleccionada,
+                   CASE WHEN o1.es_correcta = 1 THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
+                   (SELECT o2.opcion FROM opciones o2 
+                    WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1) AS respuesta_correcta
+            FROM respuestas r
+            JOIN preguntas p ON r.pregunta_id = p.id
+            LEFT JOIN opciones o1 ON r.opcion_id = o1.id
+            WHERE r.examen_id = %s
+            ORDER BY p.id
+            """
+        else:
+            cursor = conn.cursor()
+            query = """
+            SELECT p.pregunta,
+                   o1.opcion AS respuesta_seleccionada,
+                   CASE WHEN o1.es_correcta = 1 THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
+                   (SELECT o2.opcion FROM opciones o2 
+                    WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1) AS respuesta_correcta
+            FROM respuestas r
+            JOIN preguntas p ON r.pregunta_id = p.id
+            LEFT JOIN opciones o1 ON r.opcion_id = o1.id
+            WHERE r.examen_id = ?
+            ORDER BY p.id
+            """
         cursor.execute(query, (exam_id,))
         rows = cursor.fetchall()
         conn.close()
@@ -210,9 +307,9 @@ class EstadisticasController:
         """
         Construye y retorna una lista con el resumen de las respuestas incorrectas para el examen.
         Cada elemento es un diccionario con:
-        - pregunta: El enunciado de la pregunta.
-        - respuesta_correcta: La opción correcta.
-        - respuesta_usuario: La opción que el usuario seleccionó (incorrecta).
+          - pregunta: El enunciado de la pregunta.
+          - respuesta_correcta: La opción correcta.
+          - respuesta_usuario: La opción que el usuario seleccionó (incorrecta).
         """
         detalles = EstadisticasController.obtener_detalles_examen_por_id(exam_id)
         resumen = []

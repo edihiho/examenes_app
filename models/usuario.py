@@ -1,5 +1,6 @@
 import sqlite3
 import logging
+import os
 from config.database import get_connection
 
 # Configuración básica del logger (puedes configurarlo globalmente en la app)
@@ -20,8 +21,14 @@ class Usuario:
     def autenticar(correo, contraseña):
         """Verifica si el correo y la contraseña son correctos."""
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM usuarios WHERE correo = ? AND contraseña = ?', (correo, contraseña))
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = "SELECT * FROM usuarios WHERE correo = %s AND contraseña = %s"
+        else:
+            cursor = conn.cursor()
+            query = "SELECT * FROM usuarios WHERE correo = ? AND contraseña = ?"
+        cursor.execute(query, (correo, contraseña))
         usuario = cursor.fetchone()
         conn.close()
         if usuario:
@@ -40,12 +47,21 @@ class Usuario:
     def crear_usuario(nombre, correo, contraseña, tipo_usuario, rol="usuario", localidad="Risaralda"):
         """Crea un nuevo usuario en la base de datos."""
         conn = get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute('''
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = '''
+                INSERT INTO usuarios (nombre, correo, contraseña, rol, tipo_usuario, localidad) 
+                VALUES (%s, %s, %s, %s, %s, %s)
+            '''
+        else:
+            cursor = conn.cursor()
+            query = '''
                 INSERT INTO usuarios (nombre, correo, contraseña, rol, tipo_usuario, localidad) 
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (nombre, correo, contraseña, rol, tipo_usuario, localidad))
+            '''
+        try:
+            cursor.execute(query, (nombre, correo, contraseña, rol, tipo_usuario, localidad))
             conn.commit()
             return True
         except sqlite3.IntegrityError as e:
@@ -58,8 +74,14 @@ class Usuario:
     def listar_usuarios(tipo_usuario):
         """Obtiene todos los usuarios del tipo especificado."""
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT id, nombre, correo, rol, tipo_usuario, localidad FROM usuarios WHERE tipo_usuario = ?', (tipo_usuario,))
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = 'SELECT id, nombre, correo, rol, tipo_usuario, localidad FROM usuarios WHERE tipo_usuario = %s'
+        else:
+            cursor = conn.cursor()
+            query = 'SELECT id, nombre, correo, rol, tipo_usuario, localidad FROM usuarios WHERE tipo_usuario = ?'
+        cursor.execute(query, (tipo_usuario,))
         usuarios = cursor.fetchall()
         conn.close()
         return [
@@ -77,8 +99,14 @@ class Usuario:
     def eliminar_usuario(usuario_id):
         """Elimina un usuario por su ID."""
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM usuarios WHERE id = ?', (usuario_id,))
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = 'DELETE FROM usuarios WHERE id = %s'
+        else:
+            cursor = conn.cursor()
+            query = 'DELETE FROM usuarios WHERE id = ?'
+        cursor.execute(query, (usuario_id,))
         conn.commit()
         filas_afectadas = cursor.rowcount
         conn.close()
@@ -91,9 +119,15 @@ class Usuario:
         Retorna True si se actualizó correctamente, False en caso contrario.
         """
         conn = get_connection()
-        cursor = conn.cursor()
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = "UPDATE usuarios SET contraseña = %s WHERE id = %s"
+        else:
+            cursor = conn.cursor()
+            query = "UPDATE usuarios SET contraseña = ? WHERE id = ?"
         try:
-            cursor.execute("UPDATE usuarios SET contraseña = ? WHERE id = ?", (nueva_contrasena, user_id))
+            cursor.execute(query, (nueva_contrasena, user_id))
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
@@ -102,4 +136,3 @@ class Usuario:
             return False
         finally:
             conn.close()
-

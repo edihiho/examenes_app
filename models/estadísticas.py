@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import logging
 from config.database import get_connection
@@ -17,8 +18,15 @@ class Estadisticas:
     def obtener_estadisticas(usuario_id):
         """Devuelve las estadísticas de un usuario."""
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM estadisticas WHERE usuario_id = ?', (usuario_id,))
+        # Si se utiliza PostgreSQL (en producción con DATABASE_URL), usar %s como placeholder
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = 'SELECT * FROM estadisticas WHERE usuario_id = %s'
+        else:
+            cursor = conn.cursor()
+            query = 'SELECT * FROM estadisticas WHERE usuario_id = ?'
+        cursor.execute(query, (usuario_id,))
         estadisticas = cursor.fetchone()
         conn.close()
 

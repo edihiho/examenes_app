@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import logging
 from config.database import get_connection
@@ -16,8 +17,14 @@ class Examen:
     def obtener_examen(id_examen):
         """Devuelve un examen por su ID."""
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM examenes WHERE id = ?', (id_examen,))
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = 'SELECT * FROM examenes WHERE id = %s'
+        else:
+            cursor = conn.cursor()
+            query = 'SELECT * FROM examenes WHERE id = ?'
+        cursor.execute(query, (id_examen,))
         examen = cursor.fetchone()
         conn.close()
 
@@ -29,8 +36,14 @@ class Examen:
     def listar_examenes_usuario(usuario_id):
         """Devuelve todos los exámenes de un usuario."""
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM examenes WHERE usuario_id = ?', (usuario_id,))
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = 'SELECT * FROM examenes WHERE usuario_id = %s'
+        else:
+            cursor = conn.cursor()
+            query = 'SELECT * FROM examenes WHERE usuario_id = ?'
+        cursor.execute(query, (usuario_id,))
         examenes = cursor.fetchall()
         conn.close()
 

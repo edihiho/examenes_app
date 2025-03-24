@@ -1,4 +1,4 @@
-import sqlite3
+import os
 from config.database import get_connection
 
 class PreguntaController:
@@ -9,16 +9,22 @@ class PreguntaController:
         Retorna el ID de la pregunta insertada o None en caso de error.
         """
         conn = get_connection()
-        cursor = conn.cursor()
         try:
-            cursor.execute(
-                'INSERT INTO preguntas (pregunta, categoria, tipo_usuario) VALUES (?, ?, ?)',
-                (pregunta, categoria, tipo_usuario)
-            )
-            conn.commit()
-            pregunta_id = cursor.lastrowid
+            if os.getenv("DATABASE_URL"):
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                query = 'INSERT INTO preguntas (pregunta, categoria, tipo_usuario) VALUES (%s, %s, %s) RETURNING id'
+                cursor.execute(query, (pregunta, categoria, tipo_usuario))
+                pregunta_id = cursor.fetchone()["id"]
+                conn.commit()
+            else:
+                cursor = conn.cursor()
+                query = 'INSERT INTO preguntas (pregunta, categoria, tipo_usuario) VALUES (?, ?, ?)'
+                cursor.execute(query, (pregunta, categoria, tipo_usuario))
+                conn.commit()
+                pregunta_id = cursor.lastrowid
             return pregunta_id
-        except sqlite3.Error as e:
+        except Exception as e:
             print("Error al agregar la pregunta:", e)
             return None
         finally:
@@ -32,16 +38,22 @@ class PreguntaController:
         Retorna el ID de la opción insertada o None en caso de error.
         """
         conn = get_connection()
-        cursor = conn.cursor()
         try:
-            cursor.execute(
-                'INSERT INTO opciones (pregunta_id, opcion, es_correcta) VALUES (?, ?, ?)',
-                (pregunta_id, opcion, es_correcta)
-            )
-            conn.commit()
-            opcion_id = cursor.lastrowid
+            if os.getenv("DATABASE_URL"):
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                query = 'INSERT INTO opciones (pregunta_id, opcion, es_correcta) VALUES (%s, %s, %s) RETURNING id'
+                cursor.execute(query, (pregunta_id, opcion, es_correcta))
+                opcion_id = cursor.fetchone()["id"]
+                conn.commit()
+            else:
+                cursor = conn.cursor()
+                query = 'INSERT INTO opciones (pregunta_id, opcion, es_correcta) VALUES (?, ?, ?)'
+                cursor.execute(query, (pregunta_id, opcion, es_correcta))
+                conn.commit()
+                opcion_id = cursor.lastrowid
             return opcion_id
-        except sqlite3.Error as e:
+        except Exception as e:
             print("Error al agregar opción:", e)
             return None
         finally:
@@ -54,16 +66,25 @@ class PreguntaController:
         Cada pregunta se retorna como un diccionario con sus datos.
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM preguntas')
-        preguntas = cursor.fetchall()
-        conn.close()
-        return [{
-            "id": p["id"],
-            "pregunta": p["pregunta"],
-            "categoria": p["categoria"],
-            "tipo_usuario": p["tipo_usuario"]
-        } for p in preguntas]
+        try:
+            if os.getenv("DATABASE_URL"):
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            else:
+                cursor = conn.cursor()
+            cursor.execute('SELECT * FROM preguntas')
+            preguntas = cursor.fetchall()
+            return [{
+                "id": p["id"],
+                "pregunta": p["pregunta"],
+                "categoria": p["categoria"],
+                "tipo_usuario": p["tipo_usuario"]
+            } for p in preguntas]
+        except Exception as e:
+            print("Error al obtener preguntas:", e)
+            return []
+        finally:
+            conn.close()
 
     @staticmethod
     def obtener_preguntas_por_tipo(tipo_usuario):
@@ -73,16 +94,27 @@ class PreguntaController:
         Cada pregunta se retorna como un diccionario.
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM preguntas WHERE tipo_usuario = ?', (tipo_usuario,))
-        preguntas = cursor.fetchall()
-        conn.close()
-        return [{
-            "id": p["id"],
-            "pregunta": p["pregunta"],
-            "categoria": p["categoria"],
-            "tipo_usuario": p["tipo_usuario"]
-        } for p in preguntas]
+        try:
+            if os.getenv("DATABASE_URL"):
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                query = 'SELECT * FROM preguntas WHERE tipo_usuario = %s'
+            else:
+                cursor = conn.cursor()
+                query = 'SELECT * FROM preguntas WHERE tipo_usuario = ?'
+            cursor.execute(query, (tipo_usuario,))
+            preguntas = cursor.fetchall()
+            return [{
+                "id": p["id"],
+                "pregunta": p["pregunta"],
+                "categoria": p["categoria"],
+                "tipo_usuario": p["tipo_usuario"]
+            } for p in preguntas]
+        except Exception as e:
+            print("Error al obtener preguntas por tipo:", e)
+            return []
+        finally:
+            conn.close()
 
     @staticmethod
     def obtener_preguntas_completas_por_tipo(tipo_usuario):
@@ -94,50 +126,66 @@ class PreguntaController:
             "categoria": ...,
             "tipo_usuario": ...,
             "opciones": [
-                { "opcion": "...", "es_correcta": 0/1 },
+                { "id": ..., "opcion": "...", "es_correcta": 0/1 },
                 ...
             ]
           }
         """
         conn = get_connection()
-        cursor = conn.cursor()
-        # Obtener las preguntas para el tipo de usuario
-        cursor.execute('''
-            SELECT id, pregunta, categoria, tipo_usuario
-            FROM preguntas
-            WHERE tipo_usuario = ?
-        ''', (tipo_usuario,))
-        preguntas_raw = cursor.fetchall()
+        try:
+            if os.getenv("DATABASE_URL"):
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                query = '''
+                    SELECT id, pregunta, categoria, tipo_usuario
+                    FROM preguntas
+                    WHERE tipo_usuario = %s
+                '''
+            else:
+                cursor = conn.cursor()
+                query = '''
+                    SELECT id, pregunta, categoria, tipo_usuario
+                    FROM preguntas
+                    WHERE tipo_usuario = ?
+                '''
+            cursor.execute(query, (tipo_usuario,))
+            preguntas_raw = cursor.fetchall()
 
-        preguntas = []
-        for pr in preguntas_raw:
-            pregunta_id = pr["id"]
-            texto_pregunta = pr["pregunta"]
-            categoria = pr["categoria"]
-            t_user = pr["tipo_usuario"]
+            preguntas = []
+            for pr in preguntas_raw:
+                pregunta_id = pr["id"]
+                texto_pregunta = pr["pregunta"]
+                categoria = pr["categoria"]
+                t_user = pr["tipo_usuario"]
 
-            # Obtener las opciones para la pregunta
-            cursor.execute('''
-                SELECT opcion, es_correcta, id FROM opciones
-                WHERE pregunta_id = ?
-            ''', (pregunta_id,))
-            opciones_raw = cursor.fetchall()
-            lista_opciones = []
-            for op in opciones_raw:
-                lista_opciones.append({
-                    "id": op["id"],
-                    "opcion": op["opcion"],
-                    "es_correcta": op["es_correcta"]
+                # Obtener las opciones para la pregunta
+                if os.getenv("DATABASE_URL"):
+                    query_op = 'SELECT id, opcion, es_correcta FROM opciones WHERE pregunta_id = %s'
+                    cursor.execute(query_op, (pregunta_id,))
+                else:
+                    query_op = 'SELECT id, opcion, es_correcta FROM opciones WHERE pregunta_id = ?'
+                    cursor.execute(query_op, (pregunta_id,))
+                opciones_raw = cursor.fetchall()
+                lista_opciones = []
+                for op in opciones_raw:
+                    lista_opciones.append({
+                        "id": op["id"],
+                        "opcion": op["opcion"],
+                        "es_correcta": op["es_correcta"]
+                    })
+                preguntas.append({
+                    "id": pregunta_id,
+                    "pregunta": texto_pregunta,
+                    "categoria": categoria,
+                    "tipo_usuario": t_user,
+                    "opciones": lista_opciones
                 })
-            preguntas.append({
-                "id": pregunta_id,
-                "pregunta": texto_pregunta,
-                "categoria": categoria,
-                "tipo_usuario": t_user,
-                "opciones": lista_opciones
-            })
-        conn.close()
-        return preguntas
+            return preguntas
+        except Exception as e:
+            print("Error al obtener preguntas completas por tipo:", e)
+            return []
+        finally:
+            conn.close()
 
     @staticmethod
     def eliminar_pregunta(id_pregunta):
@@ -146,12 +194,17 @@ class PreguntaController:
         Retorna True si se eliminó correctamente o False en caso contrario.
         """
         conn = get_connection()
-        cursor = conn.cursor()
         try:
-            cursor.execute('DELETE FROM preguntas WHERE id = ?', (id_pregunta,))
+            if os.getenv("DATABASE_URL"):
+                cursor = conn.cursor()
+                query = 'DELETE FROM preguntas WHERE id = %s'
+            else:
+                cursor = conn.cursor()
+                query = 'DELETE FROM preguntas WHERE id = ?'
+            cursor.execute(query, (id_pregunta,))
             conn.commit()
             return cursor.rowcount > 0
-        except sqlite3.Error as e:
+        except Exception as e:
             print("Error al eliminar la pregunta:", e)
             return False
         finally:
@@ -165,19 +218,32 @@ class PreguntaController:
         Retorna el ID de la respuesta insertada o None en caso de error.
         """
         conn = get_connection()
-        cursor = conn.cursor()
         try:
-            # Consultar si la opción es correcta
-            cursor.execute("SELECT es_correcta FROM opciones WHERE id = ?", (opcion_id,))
-            row = cursor.fetchone()
-            es_correcta = row["es_correcta"] if row else 0
-            cursor.execute(
-                "INSERT INTO respuestas (examen_id, pregunta_id, opcion_id, es_correcta) VALUES (?, ?, ?, ?)",
-                (examen_id, pregunta_id, opcion_id, es_correcta)
-            )
-            conn.commit()
-            return cursor.lastrowid
-        except sqlite3.Error as e:
+            if os.getenv("DATABASE_URL"):
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                query_correcta = "SELECT es_correcta FROM opciones WHERE id = %s"
+                cursor.execute(query_correcta, (opcion_id,))
+                row = cursor.fetchone()
+                es_correcta = row["es_correcta"] if row else 0
+
+                query_insert = "INSERT INTO respuestas (examen_id, pregunta_id, opcion_id, es_correcta) VALUES (%s, %s, %s, %s) RETURNING id"
+                cursor.execute(query_insert, (examen_id, pregunta_id, opcion_id, es_correcta))
+                respuesta_id = cursor.fetchone()["id"]
+                conn.commit()
+            else:
+                cursor = conn.cursor()
+                query_correcta = "SELECT es_correcta FROM opciones WHERE id = ?"
+                cursor.execute(query_correcta, (opcion_id,))
+                row = cursor.fetchone()
+                es_correcta = row["es_correcta"] if row else 0
+
+                query_insert = "INSERT INTO respuestas (examen_id, pregunta_id, opcion_id, es_correcta) VALUES (?, ?, ?, ?)"
+                cursor.execute(query_insert, (examen_id, pregunta_id, opcion_id, es_correcta))
+                conn.commit()
+                respuesta_id = cursor.lastrowid
+            return respuesta_id
+        except Exception as e:
             print("Error al guardar respuesta:", e)
             conn.rollback()
             return None
