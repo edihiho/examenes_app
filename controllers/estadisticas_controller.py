@@ -16,7 +16,7 @@ class EstadisticasController:
         if os.getenv("DATABASE_URL"):
             import psycopg2.extras
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            # Usamos to_char para formatear la fecha en PostgreSQL
+            # En PostgreSQL, usamos true/false en lugar de 1/0
             query = """
             SELECT u.nombre,
                    e.id AS examen_id,
@@ -24,10 +24,10 @@ class EstadisticasController:
                    e.duracion,
                    (SELECT COUNT(*) FROM respuestas r
                     JOIN opciones o ON r.opcion_id = o.id
-                    WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
+                    WHERE r.examen_id = e.id AND o.es_correcta = true) AS correctas,
                    (SELECT COUNT(*) FROM respuestas r
                     JOIN opciones o ON r.opcion_id = o.id
-                    WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
+                    WHERE r.examen_id = e.id AND o.es_correcta = false) AS incorrectas
             FROM examenes e
             JOIN usuarios u ON e.usuario_id = u.id
             WHERE u.tipo_usuario = %s
@@ -81,9 +81,9 @@ class EstadisticasController:
                    to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
                    p.pregunta,
                    o1.opcion AS respuesta_seleccionada,
-                   CASE WHEN o1.es_correcta = 1 THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
+                   CASE WHEN o1.es_correcta = true THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
                    (SELECT o2.opcion FROM opciones o2 
-                    WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1) AS respuesta_correcta
+                    WHERE o2.pregunta_id = p.id AND o2.es_correcta = true) AS respuesta_correcta
             FROM examenes e
             JOIN usuarios u ON e.usuario_id = u.id
             JOIN respuestas r ON e.id = r.examen_id
@@ -141,7 +141,7 @@ class EstadisticasController:
             FROM preguntas p
             LEFT JOIN respuestas r ON p.id = r.pregunta_id
             LEFT JOIN opciones o ON r.opcion_id = o.id
-            WHERE p.tipo_usuario = %s AND o.es_correcta = 0
+            WHERE p.tipo_usuario = %s AND o.es_correcta = false
             GROUP BY p.id
             ORDER BY falladas DESC
             LIMIT 5
@@ -184,10 +184,10 @@ class EstadisticasController:
               (SELECT COUNT(*) FROM examenes WHERE usuario_id = %s) AS total_examenes,
               (SELECT COUNT(*) FROM respuestas r
                JOIN opciones o ON r.opcion_id = o.id
-               WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = %s) AND o.es_correcta = 1) AS preguntas_correctas,
+               WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = %s) AND o.es_correcta = true) AS preguntas_correctas,
               (SELECT COUNT(*) FROM respuestas r
                JOIN opciones o ON r.opcion_id = o.id
-               WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = %s) AND o.es_correcta = 0) AS preguntas_incorrectas
+               WHERE r.examen_id IN (SELECT id FROM examenes WHERE usuario_id = %s) AND o.es_correcta = false) AS preguntas_incorrectas
             """
         else:
             cursor = conn.cursor()
@@ -227,8 +227,8 @@ class EstadisticasController:
             query = """
             SELECT 
               (SELECT COUNT(*) FROM respuestas WHERE examen_id = %s) AS total_respuestas,
-              (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = %s AND o.es_correcta = 1) AS preguntas_correctas,
-              (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = %s AND o.es_correcta = 0) AS preguntas_incorrectas
+              (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = %s AND o.es_correcta = true) AS preguntas_correctas,
+              (SELECT COUNT(*) FROM respuestas r JOIN opciones o ON r.opcion_id = o.id WHERE examen_id = %s AND o.es_correcta = false) AS preguntas_incorrectas
             """
         else:
             cursor = conn.cursor()
@@ -266,9 +266,9 @@ class EstadisticasController:
             query = """
             SELECT p.pregunta,
                    o1.opcion AS respuesta_seleccionada,
-                   CASE WHEN o1.es_correcta = 1 THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
+                   CASE WHEN o1.es_correcta = true THEN 'Correcta' ELSE 'Incorrecta' END AS estado,
                    (SELECT o2.opcion FROM opciones o2 
-                    WHERE o2.pregunta_id = p.id AND o2.es_correcta = 1) AS respuesta_correcta
+                    WHERE o2.pregunta_id = p.id AND o2.es_correcta = true) AS respuesta_correcta
             FROM respuestas r
             JOIN preguntas p ON r.pregunta_id = p.id
             LEFT JOIN opciones o1 ON r.opcion_id = o1.id
