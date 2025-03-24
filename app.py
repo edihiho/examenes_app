@@ -500,7 +500,104 @@ def create_app():
             as_attachment=True,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             download_name="estadisticas.xlsx"
-        )
+        )   
+
+    @app.route('/admin/grafica/calificacion')
+    def grafica_calificacion():
+        # Recuperar filtros desde la URL
+        usuarios_str = request.args.get('usuario', '').strip()
+        lista_usuarios = [u.strip() for u in usuarios_str.split(',') if u.strip()] if usuarios_str else []
+        fecha_inicio = request.args.get('fecha_inicio', '').strip()
+        fecha_fin = request.args.get('fecha_fin', '').strip()
+        localidad = request.args.get('localidad', '').strip()
+
+        conn = get_connection()
+        # Detectar entorno y configurar cursor y query
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = """
+                SELECT e.id AS exam_id,
+                    u.nombre,
+                    to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+                    (SELECT COUNT(*) FROM respuestas r 
+                        JOIN opciones o ON r.opcion_id = o.id
+                        WHERE r.examen_id = e.id AND o.es_correcta = true) AS correctas,
+                    (SELECT COUNT(*) FROM respuestas r 
+                        JOIN opciones o ON r.opcion_id = o.id
+                        WHERE r.examen_id = e.id) AS total_respuestas
+                FROM examenes e
+                JOIN usuarios u ON e.usuario_id = u.id
+                WHERE 1=1
+            """
+            placeholder = "%s"
+        else:
+            cursor = conn.cursor()
+            query = """
+                SELECT e.id AS exam_id,
+                    u.nombre,
+                    datetime(e.fecha, 'localtime') AS fecha,
+                    (SELECT COUNT(*) FROM respuestas r 
+                        JOIN opciones o ON r.opcion_id = o.id
+                        WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
+                    (SELECT COUNT(*) FROM respuestas r 
+                        JOIN opciones o ON r.opcion_id = o.id
+                        WHERE r.examen_id = e.id) AS total_respuestas
+                FROM examenes e
+                JOIN usuarios u ON e.usuario_id = u.id
+                WHERE 1=1
+            """
+            placeholder = "?"
+        
+        params = []
+        if lista_usuarios:
+            ph = ",".join(placeholder for _ in lista_usuarios)
+            query += f" AND u.nombre IN ({ph})"
+            params.extend(lista_usuarios)
+        if localidad:
+            query += f" AND u.localidad = {placeholder}"
+            params.append(localidad)
+        if fecha_inicio:
+            query += f" AND date(e.fecha) >= {placeholder}"
+            params.append(fecha_inicio)
+        if fecha_fin:
+            query += f" AND date(e.fecha) <= {placeholder}"
+            params.append(fecha_fin)
+        query += " ORDER BY e.fecha DESC"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        # Para depuración, imprimimos la cantidad de filas obtenidas
+        print("Filas obtenidas para gráfica de calificación:", len(rows))
+
+        labels = []
+        calificaciones = []
+        # Si no se obtuvieron filas, asignamos datos por defecto
+        if not rows:
+            labels.append("No hay datos")
+            calificaciones.append(0)
+        else:
+            # Iteramos sobre los registros y calculamos la calificación
+            for row in rows:
+                total = row["total_respuestas"]
+                correct = row["correctas"]
+                # Si total es 0, se asigna 0; de lo contrario, se calcula la nota (escala de 10)
+                grade = round((correct / total) * 10, 2) if total > 0 else 0.0
+                labels.append(f"Examen {row['exam_id']} - {row['nombre']} - {row['fecha']}")
+                calificaciones.append(grade)
+            
+            # Si solo hay un registro, para evitar que la gráfica quede "plana", se puede duplicar el dato
+            if len(rows) == 1:
+                labels *= 2
+                calificaciones *= 2
+
+        data = {
+            "labels": labels,
+            "calificaciones": calificaciones
+        }
+        return jsonify(data)
 
     @app.route('/admin/grafica/top_incorrectas_preguntas')
     def grafica_top_incorrectas_preguntas():
