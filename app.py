@@ -66,9 +66,16 @@ def actualizar_duracion_examen(examen_id, duracion):
     Actualiza la columna 'duracion' en la tabla examenes para el examen dado.
     """
     conn = get_connection()
-    cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE examenes SET duracion = ? WHERE id = ?", (duracion, examen_id))
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = "UPDATE examenes SET duracion = %s WHERE id = %s"
+            cursor.execute(query, (duracion, examen_id))
+        else:
+            cursor = conn.cursor()
+            query = "UPDATE examenes SET duracion = ? WHERE id = ?"
+            cursor.execute(query, (duracion, examen_id))
         conn.commit()
     except Exception as e:
         print("Error al actualizar duración:", e)
@@ -189,17 +196,19 @@ def create_app():
                 all_preguntas = PreguntaController.obtener_preguntas_completas_por_tipo(usuario.get('tipo_usuario'))
                 random.shuffle(all_preguntas)
                 max_preguntas = config_data.get('exam_params', {}).get('num_preguntas', len(all_preguntas))
-                # Almacenar todas las preguntas sin filtrar en la sesión
-                session['preguntas_examen'] = all_preguntas[:max_preguntas]
-            # Antes de presentar, crear una copia filtrada para mostrar solo las opciones válidas
-            preguntas_presentacion = []
-            for pregunta in session.get('preguntas_examen', []):
-                # Filtrar las opciones que sean diferentes de '---'
-                opciones_filtradas = [op for op in pregunta.get('opciones', []) if op.get('opcion', "").strip().lower() != '---']
-                # Copiar la pregunta con las opciones filtradas
-                nueva_pregunta = pregunta.copy()
-                nueva_pregunta['opciones'] = opciones_filtradas
-                preguntas_presentacion.append(nueva_pregunta)
+                # Filtramos para quedarnos solo con las preguntas que tengan al menos una opción válida
+                preguntas_validas = []
+                for pregunta in all_preguntas[:max_preguntas]:
+                    # Se filtran las opciones vacías o que sean '---'
+                    opciones_filtradas = [op for op in pregunta.get('opciones', [])
+                                        if op.get('opcion', "").strip().lower() not in ["", "---"]]
+                    if opciones_filtradas:  # Solo se incluye la pregunta si tiene al menos una opción
+                        nueva_pregunta = pregunta.copy()
+                        nueva_pregunta['opciones'] = opciones_filtradas
+                        preguntas_validas.append(nueva_pregunta)
+                session['preguntas_examen'] = preguntas_validas
+            # Se usa la lista filtrada para la presentación
+            preguntas_presentacion = session.get('preguntas_examen', [])
             return render_template('examen_view.html', usuario=usuario, preguntas=preguntas_presentacion, config_data=config_data)
         else:
             examen_id = session.get('examen_id')
@@ -420,14 +429,14 @@ def create_app():
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             query = """
             SELECT u.nombre, u.localidad, e.id AS examen_id, 
-                   to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
-                   e.duracion,
-                   (SELECT COUNT(*) FROM respuestas r 
-                       JOIN opciones o ON r.opcion_id = o.id
-                       WHERE r.examen_id = e.id AND o.es_correcta = true) AS correctas,
-                   (SELECT COUNT(*) FROM respuestas r 
-                       JOIN opciones o ON r.opcion_id = o.id
-                       WHERE r.examen_id = e.id AND o.es_correcta = false) AS incorrectas
+                to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+                e.duracion,
+                (SELECT COUNT(*) FROM respuestas r 
+                    JOIN opciones o ON r.opcion_id = o.id
+                    WHERE r.examen_id = e.id AND o.es_correcta = true) AS correctas,
+                (SELECT COUNT(*) FROM respuestas r 
+                    JOIN opciones o ON r.opcion_id = o.id
+                    WHERE r.examen_id = e.id AND o.es_correcta = false) AS incorrectas
             FROM examenes e
             JOIN usuarios u ON e.usuario_id = u.id
             WHERE u.rol = 'usuario'
@@ -436,14 +445,14 @@ def create_app():
             cursor = conn.cursor()
             query = """
             SELECT u.nombre, u.localidad, e.id AS examen_id, 
-                   datetime(e.fecha, 'localtime') AS fecha,
-                   e.duracion,
-                   (SELECT COUNT(*) FROM respuestas r 
-                       JOIN opciones o ON r.opcion_id = o.id
-                       WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
-                   (SELECT COUNT(*) FROM respuestas r 
-                       JOIN opciones o ON r.opcion_id = o.id
-                       WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
+                datetime(e.fecha, 'localtime') AS fecha,
+                e.duracion,
+                (SELECT COUNT(*) FROM respuestas r 
+                    JOIN opciones o ON r.opcion_id = o.id
+                    WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
+                (SELECT COUNT(*) FROM respuestas r 
+                    JOIN opciones o ON r.opcion_id = o.id
+                    WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
             FROM examenes e
             JOIN usuarios u ON e.usuario_id = u.id
             WHERE u.rol = 'usuario'
@@ -465,12 +474,15 @@ def create_app():
             total_preguntas = row["correctas"] + row["incorrectas"]
             nota_final = round((row["correctas"] / total_preguntas * 10) if total_preguntas > 0 else 0, 2)
             porcentaje = round((row["correctas"] / total_preguntas * 100) if total_preguntas > 0 else 0, 2)
+            # Calcular la duración en minutos (si hay valor numérico)
+            duracion_min = round(row["duracion"] / 60, 2) if row["duracion"] is not None else "N/A"
             data.append({
                 "Usuario": row["nombre"],
                 "Localidad": row["localidad"],
                 "Examen ID": row["examen_id"],
                 "Fecha": row["fecha"],
                 "Duración (s)": row["duracion"],
+                "Duración (min)": duracion_min,
                 "Correctas": row["correctas"],
                 "Incorrectas": row["incorrectas"],
                 "Nota Final": nota_final,
