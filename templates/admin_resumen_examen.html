@@ -42,23 +42,27 @@
   <body>
     <!-- Header fijo e inmovilizado con los botones de exportar y cerrar sesión -->
     <div class="fixed-header">
-      <div class="header-content">
-        <h3 class="mb-0">
-          Resumen del Examen para el Usuario {{ filtered_usuario.id }} - 
-          {% if filtered_usuario.nombre %}
-            {{ filtered_usuario.nombre }}
-          {% elif filtered_usuario.correo %}
-            {{ filtered_usuario.correo }}
-          {% else %}
-            Sin nombre
-          {% endif %}
-        </h3>
-        <div>
-          <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success mr-2">Exportar a Excel</a>
-          <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
+        <div class="header-content">
+          <h3 class="mb-0">
+            {% if filtered_usuario is defined %}
+              Resumen del Examen para el Usuario {{ filtered_usuario.id }} - 
+              {% if filtered_usuario.nombre %}
+                {{ filtered_usuario.nombre }}
+              {% elif filtered_usuario.correo %}
+                {{ filtered_usuario.correo }}
+              {% else %}
+                Sin nombre
+              {% endif %}
+            {% else %}
+              Resumen del Examen
+            {% endif %}
+          </h3>
+          <div>
+            <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success mr-2">Exportar a Excel</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
+          </div>
         </div>
-      </div>
-    </div>
+      </div>      
 
     <!-- Contenido principal centrado -->
     <div class="container content-wrapper">
