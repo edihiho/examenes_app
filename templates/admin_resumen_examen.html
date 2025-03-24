@@ -1,6 +1,15 @@
 <div class="mt-3">
-    <h3>Resumen de Exámenes por Usuario</h3>
-    <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="form-inline mb-3">
+    <h3 class="text-center">Resumen del Examen para el Usuario {{ usuario.nombre }}</h3>
+    
+    <!-- Botón para exportar a Excel -->
+    <div class="text-center mb-3">
+      <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success">
+        Exportar a Excel
+      </a>
+    </div>
+    
+    <!-- Formulario para filtrar por usuario y examen -->
+    <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="form-inline justify-content-center mb-3">
       <div class="form-group mr-2">
         <label for="usuario_id" class="mr-2">Usuario ID:</label>
         <input type="number" name="usuario_id" id="usuario_id" class="form-control" required>
@@ -15,35 +24,47 @@
     {% if resumen %}
       {% for exam in resumen %}
         <div class="card mb-3">
-          <div class="card-header">
-            Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }}
+          <div class="card-header text-center">
+            Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }} 
+            {% if exam.usuario_nombre %}
+              - Usuario: {{ exam.usuario_nombre }}
+            {% endif %}
           </div>
           <div class="card-body">
-            <table class="table table-bordered">
-              <thead>
-                <tr>
-                  <th>ID Pregunta</th>
-                  <th>Pregunta</th>
-                  <th>Respuesta Seleccionada</th>
-                  <th>Respuesta Correcta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for preg in exam.preguntas %}
+            <div class="table-responsive">
+              <table class="table table-bordered mx-auto">
+                <thead class="thead-light">
                   <tr>
-                    <td>{{ preg.pregunta_id }}</td>
-                    <td>{{ preg.pregunta }}</td>
-                    <td>{{ preg.respuesta_seleccionada }}</td>
-                    <td>{{ preg.respuesta_correcta }}</td>
+                    <th>ID Pregunta</th>
+                    <th>Pregunta</th>
+                    <th>Respuesta Seleccionada</th>
+                    <th>Respuesta Correcta</th>
                   </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {% for preg in exam.preguntas %}
+                    <tr>
+                      <td class="text-center">{{ preg.pregunta_id }}</td>
+                      <td>{{ preg.pregunta }}</td>
+                      <td>{{ preg.respuesta_seleccionada }}</td>
+                      <td>{{ preg.respuesta_correcta }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       {% endfor %}
     {% else %}
-      <p>No se encontraron datos para el resumen.</p>
+      <p class="text-center">No se encontraron datos para el resumen.</p>
     {% endif %}
+    
+    <!-- Botón para volver al Dashboard -->
+    <div class="text-center mt-4">
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+        Volver al Dashboard
+      </a>
+    </div>
   </div>
   
