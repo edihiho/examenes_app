@@ -308,203 +308,6 @@ def create_app():
 
     # --- EXPORTAR ESTADÍSTICAS A EXCEL ---
     @app.route('/admin/exportar_excel')
-    def exportar_excel():
-        usuario = session.get('usuario')
-        if not usuario or usuario.get('rol') != 'admin':
-            return redirect(url_for('login'))
-        flash("Exportación a Excel pendiente de implementación.", "info")
-        return redirect(url_for('admin_statistics'))
-
-    # --- AGREGAR PREGUNTA (Formulario) ---
-    @app.route('/admin/pregunta_form', methods=['GET', 'POST'])
-    def pregunta_form():
-        usuario = session.get('usuario')
-        if not usuario or usuario.get('rol') != 'admin':
-            return redirect(url_for('login'))
-        if request.method == 'POST':
-            pregunta = request.form.get('pregunta')
-            categoria = request.form.get('categoria')
-            if not pregunta:
-                flash("La pregunta no puede estar vacía.", "error")
-                return redirect(url_for('pregunta_form'))
-            if PreguntaController.agregar_pregunta(pregunta, categoria, usuario.get('tipo_usuario')):
-                flash("Pregunta agregada correctamente.", "success")
-                return redirect(url_for('admin_questions'))
-            else:
-                flash("No se pudo agregar la pregunta.", "error")
-        return render_template('pregunta_form.html')
-
-    # --- ESTADÍSTICAS ADMIN ---
-    @app.route('/admin/statistics')
-    def admin_statistics():
-        usuario = session.get('usuario')
-        if not usuario or usuario.get('rol') != 'admin':
-            return redirect(url_for('login'))
-        examenes = EstadisticasController.obtener_examenes_por_tipo(usuario.get('tipo_usuario'))
-        return render_template('admin_statistics.html', examenes=examenes)
-
-    # --- CARGAR ESTADÍSTICAS ---
-    @app.route('/admin/cargar_estadisticas')
-    def cargar_estadisticas():
-        usuario = session.get('usuario')
-        if not usuario or usuario.get('rol') != 'admin':
-            return redirect(url_for('login'))
-        examenes = EstadisticasController.obtener_examenes_por_tipo(usuario.get('tipo_usuario'))
-        return render_template('admin_statistics.html', examenes=examenes)
-
-    # --- RUTAS PARA GRÁFICAS (Funcionalidad pendiente) ---
-    @app.route('/admin/grafica/duracion_correctas')
-    def grafica_duracion_correctas():
-        flash("Funcionalidad de gráfica pendiente.", "info")
-        return redirect(url_for('admin_statistics'))
-
-    @app.route('/admin/grafica/top_usuarios')
-    def grafica_top_usuarios():
-        flash("Funcionalidad de gráfica pendiente.", "info")
-        return redirect(url_for('admin_statistics'))
-
-    @app.route('/admin/grafica/preguntas_falladas')
-    def grafica_preguntas_falladas():
-        flash("Funcionalidad de gráfica pendiente.", "info")
-        return redirect(url_for('admin_statistics'))
-
-    @app.route('/admin/grafica/top_incorrectas')
-    def grafica_top_incorrectas():
-        flash("Funcionalidad de gráfica pendiente.", "info")
-        return redirect(url_for('admin_statistics'))
-    
-    # --- CAMBIAR CONTRASEÑA ---
-    @app.route('/admin/cambiar_contraseña/<int:user_id>', methods=['GET', 'POST'])
-    def cambiar_contraseña(user_id):
-        usuario = session.get('usuario')
-        if not usuario:
-            flash("Debe iniciar sesión.", "error")
-            return redirect(url_for('login'))
-        if usuario['rol'] != 'admin' and usuario['id'] != user_id:
-            flash("Acceso denegado.", "error")
-            return redirect(url_for('login'))
-        if request.method == 'POST':
-            nueva_contraseña = request.form.get('nueva_contraseña')
-            confirmar_contraseña = request.form.get('confirmar_contraseña')
-            if not nueva_contraseña or not confirmar_contraseña:
-                flash("Por favor, complete ambos campos.", "error")
-                return redirect(url_for('cambiar_contraseña', user_id=user_id))
-            if nueva_contraseña != confirmar_contraseña:
-                flash("Las contraseñas no coinciden.", "error")
-                return redirect(url_for('cambiar_contraseña', user_id=user_id))
-            if len(nueva_contraseña) < 6:
-                flash("La contraseña debe tener al menos 6 caracteres.", "error")
-                return redirect(url_for('cambiar_contraseña', user_id=user_id))
-            if AuthController.cambiar_contrasena(user_id, nueva_contraseña):
-                return redirect(url_for('admin_users'))
-            else:
-                flash("Error al actualizar la contraseña.", "error")
-                return redirect(url_for('cambiar_contraseña', user_id=user_id))
-        return render_template('cambiar_contrasena.html', user_id=user_id)
-
-    # --- EXAMEN PARA USUARIOS NO ADMIN ---
-    @app.route('/examen', methods=['GET', 'POST'])
-    def examen_view():
-        usuario = session.get('usuario')
-        if not usuario:
-            flash("Debe iniciar sesión.", "error")
-            return redirect(url_for('login'))
-        config_data = load_app_config()
-        if request.method == 'GET':
-            if 'examen_id' not in session or 'preguntas_examen' not in session:
-                examen_id = crear_examen(usuario['id'])
-                if examen_id is None:
-                    flash("Error al crear el examen.", "error")
-                    return redirect(url_for('examen_view'))
-                session['examen_id'] = examen_id
-                session['examen_start'] = time.time()
-                all_preguntas = PreguntaController.obtener_preguntas_completas_por_tipo(usuario.get('tipo_usuario'))
-                random.shuffle(all_preguntas)
-                max_preguntas = config_data.get('exam_params', {}).get('num_preguntas', len(all_preguntas))
-                session['preguntas_examen'] = all_preguntas[:max_preguntas]
-            preguntas = session.get('preguntas_examen', [])
-            return render_template('examen_view.html', usuario=usuario, preguntas=preguntas, config_data=config_data)
-        else:
-            examen_id = session.get('examen_id')
-            if not examen_id:
-                flash("No se encontró el examen en sesión.", "error")
-                return redirect(url_for('examen_view'))
-            examen_start = session.get('examen_start')
-            duration = int(time.time() - examen_start) if examen_start else 0
-            actualizar_duracion_examen(examen_id, duration)
-            preguntas = session.get('preguntas_examen', [])
-            for pregunta in preguntas:
-                opcion_id = request.form.get(f"respuesta_{pregunta['id']}")
-                if opcion_id:
-                    PreguntaController.guardar_respuesta(examen_id, pregunta['id'], opcion_id)
-            flash("Respuestas enviadas correctamente.", "success")
-            session.pop('examen_id', None)
-            session.pop('examen_start', None)
-            session.pop('preguntas_examen', None)
-            return redirect(url_for('resultados_view', exam_id=examen_id))
-
-    # --- RESULTADOS Y ESTADÍSTICAS DEL EXAMEN ACTUAL ---
-    @app.route('/resultados/<int:exam_id>')
-    def resultados_view(exam_id):
-        stats = EstadisticasController.obtener_estadisticas_examen(exam_id)
-        return render_template('resultados_view.html', exam_id=exam_id, stats=stats)
-
-    @app.route('/admin/grafica/calificacion')
-    def grafica_calificacion():
-        usuarios_str = request.args.get('usuario', '').strip()
-        lista_usuarios = [u.strip() for u in usuarios_str.split(',') if u.strip()] if usuarios_str else []
-        fecha_inicio = request.args.get('fecha_inicio', '').strip()
-        fecha_fin = request.args.get('fecha_fin', '').strip()
-        localidad = request.args.get('localidad', '').strip()
-        conn = get_connection()
-        cursor = conn.cursor()
-        query = """
-            SELECT e.id AS exam_id,
-                u.nombre,
-                datetime(e.fecha, 'localtime') AS fecha,
-                (SELECT COUNT(*) FROM respuestas r 
-                    JOIN opciones o ON r.opcion_id = o.id
-                    WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
-                (SELECT COUNT(*) FROM respuestas r 
-                    JOIN opciones o ON r.opcion_id = o.id
-                    WHERE r.examen_id = e.id) AS total_respuestas
-            FROM examenes e
-            JOIN usuarios u ON e.usuario_id = u.id
-            WHERE 1=1
-        """
-        params = []
-        if lista_usuarios:
-            placeholders = ",".join("?" for _ in lista_usuarios)
-            query += f" AND u.nombre IN ({placeholders})"
-            params.extend(lista_usuarios)
-        if localidad:
-            query += " AND u.localidad = ?"
-            params.append(localidad)
-        if fecha_inicio:
-            query += " AND date(e.fecha) >= ?"
-            params.append(fecha_inicio)
-        if fecha_fin:
-            query += " AND date(e.fecha) <= ?"
-            params.append(fecha_fin)
-        query += " ORDER BY e.fecha DESC"
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
-        labels = []
-        calificaciones = []
-        for row in rows:
-            total = row["total_respuestas"]
-            correct = row["correctas"]
-            grade = round((correct / total) * 10, 2) if total > 0 else 0.0
-            labels.append(f"Examen {row['exam_id']} - {row['nombre']} - {row['fecha']}")
-            calificaciones.append(grade)
-        data = {
-            "labels": labels,
-            "calificaciones": calificaciones
-        }
-        return jsonify(data)
-
-    @app.route('/admin/exportar_excel_calificacion')
     def exportar_excel_calificacion():
         usuario = session.get('usuario')
         if not usuario or usuario.get('rol') != 'admin':
@@ -514,27 +317,45 @@ def create_app():
         filtro_fecha_inicio = request.args.get('fecha_inicio', '')
         filtro_fecha_fin = request.args.get('fecha_fin', '')
         conn = get_connection()
-        cursor = conn.cursor()
-        query = """
-        SELECT u.nombre, u.localidad, e.id AS examen_id, datetime(e.fecha, 'localtime') AS fecha,
-            e.duracion,
-            (SELECT COUNT(*) FROM respuestas r 
-                JOIN opciones o ON r.opcion_id = o.id
-                WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
-            (SELECT COUNT(*) FROM respuestas r 
-                JOIN opciones o ON r.opcion_id = o.id
-                WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
-        FROM examenes e
-        JOIN usuarios u ON e.usuario_id = u.id
-        WHERE u.rol = 'usuario'
-        """
+        # Configurar cursor y query según entorno
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = """
+            SELECT u.nombre, u.localidad, e.id AS examen_id, 
+                   to_char(e.fecha AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+                   e.duracion,
+                   (SELECT COUNT(*) FROM respuestas r 
+                       JOIN opciones o ON r.opcion_id = o.id
+                       WHERE r.examen_id = e.id AND o.es_correcta = true) AS correctas,
+                   (SELECT COUNT(*) FROM respuestas r 
+                       JOIN opciones o ON r.opcion_id = o.id
+                       WHERE r.examen_id = e.id AND o.es_correcta = false) AS incorrectas
+            FROM examenes e
+            JOIN usuarios u ON e.usuario_id = u.id
+            WHERE u.rol = 'usuario'
+            """
+        else:
+            cursor = conn.cursor()
+            query = """
+            SELECT u.nombre, u.localidad, e.id AS examen_id, 
+                   datetime(e.fecha, 'localtime') AS fecha,
+                   e.duracion,
+                   (SELECT COUNT(*) FROM respuestas r 
+                       JOIN opciones o ON r.opcion_id = o.id
+                       WHERE r.examen_id = e.id AND o.es_correcta = 1) AS correctas,
+                   (SELECT COUNT(*) FROM respuestas r 
+                       JOIN opciones o ON r.opcion_id = o.id
+                       WHERE r.examen_id = e.id AND o.es_correcta = 0) AS incorrectas
+            FROM examenes e
+            JOIN usuarios u ON e.usuario_id = u.id
+            WHERE u.rol = 'usuario'
+            """
         params = []
         if filtro_usuarios:
-            usuarios_lista = [u.strip() for u in filtro_usuarios.split(',') if u.strip()]
-            if usuarios_lista:
-                placeholders = ",".join("?" for _ in usuarios_lista)
-                query += f" AND u.nombre IN ({placeholders})"
-                params.extend(usuarios_lista)
+            placeholders = ",".join("?" for _ in filtro_usuarios.split(',') if _)
+            query += f" AND u.nombre IN ({placeholders})"
+            params.extend([u.strip() for u in filtro_usuarios.split(',') if u.strip()])
         if filtro_fecha_inicio and filtro_fecha_fin:
             query += " AND e.fecha BETWEEN ? AND ?"
             params.extend([filtro_fecha_inicio, filtro_fecha_fin])
@@ -577,15 +398,27 @@ def create_app():
         fecha_inicio = request.args.get('fecha_inicio', '').strip()
         fecha_fin = request.args.get('fecha_fin', '').strip()
         conn = get_connection()
-        cursor = conn.cursor()
-        query = """
+        if os.getenv("DATABASE_URL"):
+            import psycopg2.extras
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            query = """
             SELECT p.pregunta, COUNT(r.id) AS incorrectas
             FROM preguntas p
             LEFT JOIN respuestas r ON p.id = r.pregunta_id
             LEFT JOIN examenes e ON r.examen_id = e.id
             LEFT JOIN usuarios u ON e.usuario_id = u.id
             WHERE u.rol = 'usuario'
-        """
+            """
+        else:
+            cursor = conn.cursor()
+            query = """
+            SELECT p.pregunta, COUNT(r.id) AS incorrectas
+            FROM preguntas p
+            LEFT JOIN respuestas r ON p.id = r.pregunta_id
+            LEFT JOIN examenes e ON r.examen_id = e.id
+            LEFT JOIN usuarios u ON e.usuario_id = u.id
+            WHERE u.rol = 'usuario'
+            """
         params = []
         if fecha_inicio:
             query += " AND date(e.fecha) >= ?"
