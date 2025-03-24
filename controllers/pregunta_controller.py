@@ -42,8 +42,10 @@ class PreguntaController:
             if os.getenv("DATABASE_URL"):
                 import psycopg2.extras
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                # Convertir el valor a booleano para PostgreSQL
+                es_correcta_bool = True if int(es_correcta) == 1 else False
                 query = 'INSERT INTO opciones (pregunta_id, opcion, es_correcta) VALUES (%s, %s, %s) RETURNING id'
-                cursor.execute(query, (pregunta_id, opcion, es_correcta))
+                cursor.execute(query, (pregunta_id, opcion, es_correcta_bool))
                 opcion_id = cursor.fetchone()["id"]
                 conn.commit()
             else:
@@ -58,7 +60,7 @@ class PreguntaController:
             return None
         finally:
             conn.close()
-
+            
     @staticmethod
     def obtener_preguntas():
         """
