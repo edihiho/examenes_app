@@ -85,7 +85,7 @@ def create_app():
                 return redirect(url_for('login'))
             usuario = AuthController.login(correo, contraseña)
             if usuario:
-                # Convertir el ID a entero para asegurar que se pase el tipo correcto
+                # Aseguramos que el ID sea entero para construir la URL correctamente
                 session['usuario'] = {
                     'id': int(usuario.id),
                     'nombre': usuario.nombre,
@@ -130,6 +130,35 @@ def create_app():
             active_tab=active_tab
         )
     
+    # --- CAMBIAR CONTRASEÑA ---
+    @app.route('/admin/cambiar_contraseña/<int:user_id>', methods=['GET', 'POST'])
+    def cambiar_contraseña(user_id):
+        usuario = session.get('usuario')
+        if not usuario:
+            flash("Debe iniciar sesión.", "error")
+            return redirect(url_for('login'))
+        if usuario['rol'] != 'admin' and usuario['id'] != user_id:
+            flash("Acceso denegado.", "error")
+            return redirect(url_for('login'))
+        if request.method == 'POST':
+            nueva_contraseña = request.form.get('nueva_contraseña')
+            confirmar_contraseña = request.form.get('confirmar_contraseña')
+            if not nueva_contraseña or not confirmar_contraseña:
+                flash("Por favor, complete ambos campos.", "error")
+                return redirect(url_for('cambiar_contraseña', user_id=user_id))
+            if nueva_contraseña != confirmar_contraseña:
+                flash("Las contraseñas no coinciden.", "error")
+                return redirect(url_for('cambiar_contraseña', user_id=user_id))
+            if len(nueva_contraseña) < 6:
+                flash("La contraseña debe tener al menos 6 caracteres.", "error")
+                return redirect(url_for('cambiar_contraseña', user_id=user_id))
+            if AuthController.cambiar_contrasena(user_id, nueva_contraseña):
+                return redirect(url_for('admin_users'))
+            else:
+                flash("Error al actualizar la contraseña.", "error")
+                return redirect(url_for('cambiar_contraseña', user_id=user_id))
+        return render_template('cambiar_contrasena.html', user_id=user_id)
+
     # --- GUARDAR PARÁMETROS DEL EXAMEN ---
     @app.route('/admin/config/guardar', methods=['POST'])
     def guardar_parametros_examen():
