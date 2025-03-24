@@ -415,12 +415,10 @@ def create_app():
     @app.route('/admin/resumen_examen_usuario', methods=['GET'])
     def resumen_examen_usuario():
         """
-        Interfaz para filtrar por usuario y ver, para cada examen, las preguntas
-        incorrectas junto con la respuesta seleccionada y la respuesta correcta.
+        Interfaz para filtrar por usuario y ver, para cada examen, las preguntas incorrectas junto con la respuesta seleccionada y la respuesta correcta.
         Se espera un parámetro 'usuario_id' en la URL.
-        Ejemplo: /admin/resumen_examen_usuario?usuario_id=2
+        Ejemplo: /admin/resumen_examen_usuario?usuario_id=2&exam_id=...
         """
-        # Verificar que el usuario autenticado sea admin
         admin = session.get('usuario')
         if not admin or admin.get('rol') != 'admin':
             flash("Acceso denegado.", "error")
@@ -431,9 +429,24 @@ def create_app():
             flash("Debes indicar un usuario a consultar.", "error")
             return redirect(url_for('admin_dashboard'))
         
+        # Definir filtered_usuario por defecto
+        filtered_usuario = {}
+        
         conn = get_connection()
         try:
-            # Dependiendo del entorno, configurar el cursor y la consulta
+            if os.getenv("DATABASE_URL"):
+                import psycopg2.extras
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cursor.execute("SELECT id, nombre, correo FROM usuarios WHERE id = %s", (usuario_id,))
+            else:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, nombre, correo FROM usuarios WHERE id = ?", (usuario_id,))
+            filtered_usuario = cursor.fetchone()
+            if not filtered_usuario:
+                flash("Usuario no encontrado.", "error")
+                return redirect(url_for('admin_dashboard'))
+            
+            # Consulta para obtener el resumen de exámenes
             if os.getenv("DATABASE_URL"):
                 import psycopg2.extras
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -488,7 +501,6 @@ def create_app():
         finally:
             conn.close()
         
-        # Agrupar resultados por examen para facilitar la visualización
         resumen_por_examen = {}
         for r in resultados:
             exam_id = r['examen_id']
@@ -504,7 +516,6 @@ def create_app():
                 "respuesta_correcta": r['respuesta_correcta']
             })
         
-        # Convertir a lista para pasar al template
         resumen_list = []
         for exam_id, info in resumen_por_examen.items():
             resumen_list.append({
@@ -513,8 +524,8 @@ def create_app():
                 "preguntas": info["preguntas"]
             })
         
-        # Se pasa también la variable 'usuario' obtenida de la sesión
-        return render_template("resumen_usuario.html", resumen=resumen_list, usuario_id=usuario_id, usuario=session.get('usuario'))
+        return render_template("resumen_usuario.html", resumen=resumen_list, usuario_id=usuario_id, filtered_usuario=filtered_usuario)
+
     
     @app.route('/admin/exportar_excel_resumen')
     def exportar_excel_resumen():
