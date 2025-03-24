@@ -18,6 +18,17 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+# --- Configuración para usar Postgres en Render ---
+# Si la variable DATABASE_URL existe (definida por Render), se le añade sslmode=require
+db_url = os.getenv('DATABASE_URL')
+if db_url:
+    if 'sslmode' not in db_url:
+        if '?' in db_url:
+            db_url += '&sslmode=require'
+        else:
+            db_url += '?sslmode=require'
+    os.environ['DATABASE_URL'] = db_url
+
 app = Flask(__name__, template_folder='templates')
 app.config['SECRET_KEY'] = 'tu_clave_secreta'  # Cambia esto por una clave segura
 
@@ -595,8 +606,6 @@ def create_app():
 
     return app
 
-    # ... (todo el código de rutas y funciones que ya tienes)
-
     # Importante: crea la aplicación a nivel global para que Gunicorn la encuentre.
 app = create_app()
 
@@ -610,10 +619,9 @@ if __name__ == '__main__':
         port = int(os.getenv('FLASK_RUN_PORT', 5000))
         debug = True  # Modo debug activado en desarrollo
     else:
-        # Configuración para producción
+        # Configuración para producción en Render: se utiliza la variable PORT
         host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
-        port = int(os.getenv('FLASK_RUN_PORT', 8000))
+        port = int(os.getenv('PORT', 8000))
         debug = False  # Modo debug desactivado en producción
 
     app.run(host=host, port=port, debug=debug)
-
