@@ -3,46 +3,52 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Resumen de Exámenes por Usuario</title>
+    <title>Resumen de Exámenes</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
     <style>
-      /* Estilos para fijar el header superior */
-      .fixed-top-header {
+      /* Header fijo */
+      .fixed-header {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         background-color: #f7f7f7;
-        z-index: 1050;
+        z-index: 1000;
         border-bottom: 1px solid #ccc;
         padding: 10px 0;
       }
-      .fixed-top-header h3,
-      .fixed-top-header .btn {
-        margin: 0 10px;
+      .fixed-header .header-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 15px;
       }
-      /* Agregar margen superior al contenido para que no quede oculto tras el header */
-      .content-container {
-        margin-top: 120px; /* Ajusta este valor según la altura de tu header fijo */
+      /* Margen superior para que el contenido no quede oculto tras el header */
+      .content-wrapper {
+        margin-top: 90px; /* Ajusta según la altura del header */
       }
     </style>
   </head>
   <body>
-    <!-- Header fijo -->
-    <div class="fixed-top-header text-center">
-      <h3 class="d-inline">Resumen del Examen para el Usuario {{ usuario.nombre }}</h3>
-      <div class="d-inline">
-        <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success">Exportar a Excel</a>
-        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Volver al Dashboard</a>
-        <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
+    <!-- Header fijo con título y botones -->
+    <div class="fixed-header">
+      <div class="header-content">
+        <div>
+          <h3 class="mb-0">Resumen del Examen para el Usuario {{ usuario.id }} - {{ usuario.nombre or usuario.correo }}</h3>
+        </div>
+        <div>
+          <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success">Exportar a Excel</a>
+          <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
+        </div>
       </div>
     </div>
 
-    <!-- Contenedor de contenido desplazable -->
-    <div class="container content-container">
-      <!-- Formulario para filtrar por usuario y examen -->
+    <div class="container content-wrapper">
+      <!-- Formulario de filtro -->
       <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="form-inline justify-content-center mb-3">
         <div class="form-group mr-2">
           <label for="usuario_id" class="mr-2 font-weight-bold">Usuario ID:</label>
@@ -54,12 +60,13 @@
         </div>
         <button type="submit" class="btn btn-primary">Filtrar</button>
       </form>
-      
+
+      <!-- Resultados del resumen -->
       {% if resumen %}
         {% for exam in resumen %}
           <div class="card mb-3">
             <div class="card-header text-center">
-              Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }} 
+              Examen ID: {{ exam.examen_id }} - Fecha: {{ exam.fecha }}
               {% if exam.usuario_nombre %}
                 - Usuario: {{ exam.usuario_nombre }}
               {% endif %}
@@ -93,6 +100,11 @@
       {% else %}
         <p class="text-center text-muted">No se encontraron datos para el resumen.</p>
       {% endif %}
+
+      <!-- Botón para volver al Dashboard -->
+      <div class="text-center mt-4">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Volver al Dashboard</a>
+      </div>
     </div>
 
     <!-- Inclusión de jQuery, Popper.js y Bootstrap JS -->
