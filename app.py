@@ -85,8 +85,9 @@ def create_app():
                 return redirect(url_for('login'))
             usuario = AuthController.login(correo, contraseña)
             if usuario:
+                # Convertir el ID a entero para asegurar que se pase el tipo correcto
                 session['usuario'] = {
-                    'id': usuario.id,
+                    'id': int(usuario.id),
                     'nombre': usuario.nombre,
                     'rol': usuario.rol,
                     'tipo_usuario': usuario.tipo_usuario
