@@ -189,9 +189,18 @@ def create_app():
                 all_preguntas = PreguntaController.obtener_preguntas_completas_por_tipo(usuario.get('tipo_usuario'))
                 random.shuffle(all_preguntas)
                 max_preguntas = config_data.get('exam_params', {}).get('num_preguntas', len(all_preguntas))
+                # Almacenar todas las preguntas sin filtrar en la sesión
                 session['preguntas_examen'] = all_preguntas[:max_preguntas]
-            preguntas = session.get('preguntas_examen', [])
-            return render_template('examen_view.html', usuario=usuario, preguntas=preguntas, config_data=config_data)
+            # Antes de presentar, crear una copia filtrada para mostrar solo las opciones válidas
+            preguntas_presentacion = []
+            for pregunta in session.get('preguntas_examen', []):
+                # Filtrar las opciones que sean diferentes de '---'
+                opciones_filtradas = [op for op in pregunta.get('opciones', []) if op.get('opcion', "").strip().lower() != '---']
+                # Copiar la pregunta con las opciones filtradas
+                nueva_pregunta = pregunta.copy()
+                nueva_pregunta['opciones'] = opciones_filtradas
+                preguntas_presentacion.append(nueva_pregunta)
+            return render_template('examen_view.html', usuario=usuario, preguntas=preguntas_presentacion, config_data=config_data)
         else:
             examen_id = session.get('examen_id')
             if not examen_id:
