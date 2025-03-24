@@ -412,8 +412,8 @@ def create_app():
             return redirect(url_for('admin_questions'))
         return render_template('cargar_excel.html')
     
-    @app.route('/admin/resumen_usuario', methods=['GET'])
-    def resumen_usuario():
+    @app.route('/admin/resumen_examen_usuario', methods=['GET'])
+    def resumen_examen_usuario():
         """
         Interfaz para filtrar por usuario y ver, para cada examen, las preguntas
         incorrectas junto con la respuesta seleccionada y la respuesta correcta.
