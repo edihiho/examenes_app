@@ -548,31 +548,18 @@ def create_app():
     def exportar_excel_resumen():
         """
         Exporta a Excel un resumen de las preguntas incorrectas para un usuario específico.
-        Se esperan los siguientes parámetros de consulta:
-        - usuario_id: ID del usuario (requerido)
-        - exam_id: ID del examen (opcional)
-        El resumen incluye:
-        - Examen ID, Fecha, ID y enunciado de la pregunta,
-        - Respuesta Seleccionada, Respuesta Correcta y el nombre del usuario.
+        Se espera el parámetro 'usuario_id' y opcionalmente 'exam_id'.
         """
-        # Verificar que el administrador esté autenticado
-        usuario = session.get('usuario')
-        if not usuario or usuario.get('rol') != 'admin':
-            flash("Acceso denegado.", "error")
-            return redirect(url_for('login'))
-        
-        # Obtener parámetros de consulta
         usuario_id = request.args.get('usuario_id')
+        exam_id_filter = request.args.get('exam_id')
         if not usuario_id:
             flash("Debe especificar un usuario para exportar.", "error")
             return redirect(url_for('resumen_examen_usuario'))
         
-        exam_id_filter = request.args.get('exam_id')
-        
+        # Aquí va la lógica para generar el resumen, similar a la que usas en el endpoint de resumen.
         conn = get_connection()
         try:
             if os.getenv("DATABASE_URL"):
-                # Uso de PostgreSQL
                 import psycopg2.extras
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
                 query = """
@@ -595,11 +582,10 @@ def create_app():
                     WHERE e.usuario_id = %s AND o1.es_correcta = false
                 """
                 params = [usuario_id]
-                if exam_id_filter:
+                if exam_id_filter and exam_id_filter.strip() != "":
                     query += " AND e.id = %s"
-                    params.append(exam_id_filter)
+                    params.append(int(exam_id_filter))
             else:
-                # Uso de SQLite
                 cursor = conn.cursor()
                 query = """
                     SELECT 
@@ -621,27 +607,27 @@ def create_app():
                     WHERE e.usuario_id = ? AND o1.es_correcta = 0
                 """
                 params = [usuario_id]
-                if exam_id_filter:
+                if exam_id_filter and exam_id_filter.strip() != "":
                     query += " AND e.id = ?"
-                    params.append(exam_id_filter)
+                    params.append(int(exam_id_filter))
             query += " ORDER BY e.fecha DESC, p.id"
             cursor.execute(query, params)
-            rows = cursor.fetchall()
+            resultados = cursor.fetchall()
         except Exception as e:
             print("Error al obtener resumen para exportación:", e)
-            rows = []
+            resultados = []
         finally:
             conn.close()
         
-        # Crear un DataFrame con pandas
         import pandas as pd
-        if rows:
-            df = pd.DataFrame(rows)
+        if resultados:
+            df = pd.DataFrame(resultados)
         else:
             df = pd.DataFrame(columns=["examen_id", "fecha", "pregunta_id", "pregunta", "respuesta_seleccionada", "respuesta_correcta", "usuario_nombre"])
         
         # Directorio temporal para guardar el archivo Excel
-        temp_dir = os.path.join(project_root, "temp")
+        import os
+        temp_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "temp")
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
         file_path = os.path.join(temp_dir, "resumen_examen.xlsx")
@@ -649,12 +635,13 @@ def create_app():
         with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Resumen")
         
+        from flask import send_file
         return send_file(
             file_path,
             as_attachment=True,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             download_name="resumen_examen.xlsx"
-    )
+        )
 
     # --- EXPORTAR ESTADÍSTICAS A EXCEL ---
     @app.route('/admin/exportar_excel')

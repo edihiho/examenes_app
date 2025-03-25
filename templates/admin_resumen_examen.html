@@ -7,38 +7,31 @@
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
     <style>
-      /* Header fijo e inmovilizado */
-      .fixed-header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        background-color: #f7f7f7;
-        border-bottom: 1px solid #ccc;
-        z-index: 1000;
-        padding: 10px 0;
-        text-align: center;
-      }
-      .fixed-header .header-content {
-        display: inline-block;
-      }
-      .fixed-header h3 {
-        margin-bottom: 10px;
-      }
-      /* Contenedor principal: se añade margen superior para evitar que el contenido quede tapado */
+      /* Contenedor principal centrado */
       .content-wrapper {
-        margin-top: 120px;
+        margin: 30px auto;
         max-width: 1200px;
-        margin-left: auto;
-        margin-right: auto;
       }
-      /* Centramos tablas y textos */
+      /* Encabezado estático centrado */
+      .page-header {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      /* Centramos tablas y textos en las tarjetas */
       .card-header, .card-body, .table, .table thead th {
         text-align: center;
       }
-      /* Formulario y botones centrados */
-      .filter-form, .action-buttons, .back-button {
+      /* Botones centrados */
+      .action-buttons, .back-button {
         text-align: center;
+        margin-bottom: 20px;
+      }
+      /* Formulario centrado */
+      .filter-form {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 30px;
       }
       .filter-form .form-group {
         margin-right: 15px;
@@ -46,10 +39,10 @@
     </style>
   </head>
   <body>
-    <!-- Header fijo e inmovilizado -->
-    <div class="fixed-header">
-      <div class="header-content">
-        <h3 class="mb-0">
+    <div class="container content-wrapper">
+      <!-- Encabezado con el título -->
+      <div class="page-header">
+        <h3>
           {% if filtered_usuario is defined and filtered_usuario %}
             Resumen del Examen para el Usuario {{ filtered_usuario.id }} - 
             {% if filtered_usuario.nombre %}
@@ -63,17 +56,16 @@
             Resumen del Examen
           {% endif %}
         </h3>
-        <div class="action-buttons">
-          <a href="{{ url_for('exportar_excel_resumen') }}" class="btn btn-success mr-2">Exportar a Excel</a>
-          <a href="{{ url_for('logout') }}" class="btn btn-danger" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
-        </div>
       </div>
-    </div>
 
-    <!-- Contenedor principal centrado -->
-    <div class="container content-wrapper">
-      <!-- Formulario de filtro (opcional) -->
-      <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="form-inline filter-form mb-4 justify-content-center">
+      <!-- Botones de acción superiores (Cerrar Sesión, Volver al Dashboard) -->
+      <div class="action-buttons mb-4">
+        <a href="{{ url_for('logout') }}" class="btn btn-danger mr-2" onclick="return confirm('¿Está seguro de cerrar sesión?');">Cerrar Sesión</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Volver al Dashboard</a>
+      </div>
+
+      <!-- Formulario de filtro -->
+      <form method="get" action="{{ url_for('resumen_examen_usuario') }}" class="filter-form">
         <div class="form-group">
           <label for="usuario_id" class="mr-2 font-weight-bold">Usuario ID:</label>
           <input type="number" name="usuario_id" id="usuario_id" class="form-control" placeholder="Ej. 3" required>
@@ -84,6 +76,13 @@
         </div>
         <button type="submit" class="btn btn-primary">Filtrar</button>
       </form>
+
+      <!-- Botón para exportar a Excel (se muestra solo si hay resultados) -->
+      {% if resumen %}
+        <div class="action-buttons mb-4">
+          <a href="{{ url_for('exportar_excel_resumen', usuario_id=usuario_id, exam_id=request.args.get('exam_id', '')) }}" class="btn btn-success">Exportar a Excel</a>
+        </div>
+      {% endif %}
 
       <!-- Resultados del resumen -->
       {% if resumen %}
@@ -127,7 +126,7 @@
         <p class="text-center text-muted">No se encontraron datos para el resumen.</p>
       {% endif %}
 
-      <!-- Botón para volver al Dashboard -->
+      <!-- Botón para volver al Dashboard (también puede quedar en la parte inferior) -->
       <div class="back-button text-center mt-4">
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Volver al Dashboard</a>
       </div>
